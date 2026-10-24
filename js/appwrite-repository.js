@@ -262,6 +262,57 @@
     ];
   }
 
+  // Media Appwrite hanya publik jika direferensikan oleh konten yang terbit.
+  function mediaIdsIn(value) {
+    const ids = new Set();
+    const text = String(value || '');
+    const pattern = /\/storage\/buckets\/media\/files\/([^/?#"'\\s]+)\/(?:view|preview|download)/g;
+    let match;
+    while ((match = pattern.exec(text))) {
+      try { ids.add(decodeURIComponent(match[1])); } catch (e) { /* abaikan URL tidak valid */ }
+    }
+    return ids;
+  }
+
+  function mediaIdsInItem(item) {
+    return new Set([...mediaIdsIn(item && item.cover), ...mediaIdsIn(item && item.content)]);
+  }
+
+  function mergeIds() {
+    return new Set([].concat(...Array.from(arguments, (value) => Array.from(value || []))));
+  }
+
+  async function syncMediaPermissions(ids, override) {
+    const targets = Array.from(new Set(ids || [])).filter((id) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/.test(id));
+    if (!targets.length) return;
+
+    const publishedIds = new Set();
+    for (const kind of ['activities', 'articles']) {
+      const rows = await listRows(MAP[kind].table);
+      for (const row of rows) {
+        if (override && override.kind === kind && override.id === row.$id) continue;
+        if (row.status === 'published') {
+          mediaIdsInItem(row).forEach((id) => publishedIds.add(id));
+        }
+      }
+    }
+
+    if (override && override.item && override.item.status === 'published') {
+      mediaIdsInItem(override.item).forEach((id) => publishedIds.add(id));
+    }
+
+    for (const id of targets) {
+      const permissions = [
+        publishedIds.has(id) ? 'read("any")' : 'read("' + TEAM + '")',
+        'update("' + TEAM + '")',
+        'delete("' + TEAM + '")',
+      ];
+      await request('PATCH', '/storage/buckets/' + CFG.bucket + '/files/' + encodeURIComponent(id), {
+        json: { permissions },
+      });
+    }
+  }
+
   // Row ID maks. 36 karakter, hanya a-z A-Z 0-9 . - _
   function makeRowId(existingIds, title) {
     const ids = new Set(existingIds);
@@ -330,37 +381,65 @@
     const m = MAP[kind];
     const data = m.toData(item);
     const permissions = permissionsFor(kind, data);
+    const previous = item.id ? await getOne(kind, item.id) : null;
+    const touched = mergeIds(mediaIdsInItem(previous), mediaIdsInItem(data));
 
-    if (item.id) {
-      try {
-        const row = await request('PATCH', rowsPath(m.table, item.id), { json: { data, permissions } });
-        return Object.assign(item, m.fromRow(row));
-      } catch (err) {
-        if (err.status !== 404) throw err;
-        // baris belum ada di Appwrite: buat dengan ID yang sama
-        const row = await request('POST', rowsPath(m.table), { json: { rowId: item.id, data, permissions } });
-        return Object.assign(item, m.fromRow(row));
-      }
+    // Fail closed on unpublish/cover removal: adjust file access before the
+    // content write, then restore permissions from persisted content on error.
+    if (item.id && touched.size) {
+      await syncMediaPermissions(touched, { kind, id: item.id, item: data });
     }
 
-    const existing = (await listRows(m.table)).map((r) => r.$id);
-    let rowId = makeRowId(existing, item.title);
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const row = await request('POST', rowsPath(m.table), { json: { rowId, data, permissions } });
-        return Object.assign(item, m.fromRow(row));
-      } catch (err) {
-        if (err.status !== 409) throw err;
-        rowId = rowId.slice(0, 32) + randomSuffix();
+    try {
+      if (item.id) {
+        try {
+          const row = await request('PATCH', rowsPath(m.table, item.id), { json: { data, permissions } });
+          if (touched.size) await syncMediaPermissions(touched);
+          return Object.assign(item, m.fromRow(row));
+        } catch (err) {
+          if (err.status !== 404) throw err;
+          const row = await request('POST', rowsPath(m.table), { json: { rowId: item.id, data, permissions } });
+          if (touched.size) await syncMediaPermissions(touched);
+          return Object.assign(item, m.fromRow(row));
+        }
       }
+
+      const existing = (await listRows(m.table)).map((r) => r.$id);
+      let rowId = makeRowId(existing, item.title);
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const row = await request('POST', rowsPath(m.table), { json: { rowId, data, permissions } });
+          if (touched.size) await syncMediaPermissions(touched);
+          return Object.assign(item, m.fromRow(row));
+        } catch (err) {
+          if (err.status !== 409) throw err;
+          rowId = rowId.slice(0, 32) + randomSuffix();
+        }
+      }
+      throw new ApiError(409, 'Gagal membuat ID unik, coba lagi.');
+    } catch (err) {
+      if (touched.size) {
+        try { await syncMediaPermissions(touched); } catch (syncErr) {
+          console.error('Gagal memulihkan izin media setelah penyimpanan gagal.', syncErr);
+        }
+      }
+      throw err;
     }
-    throw new ApiError(409, 'Gagal membuat ID unik, coba lagi.');
   }
 
   async function deleteKind(kind, id) {
+    const previous = await getOne(kind, id);
+    const touched = mediaIdsInItem(previous);
+    if (touched.size) await syncMediaPermissions(touched, { kind, id, item: null });
     try {
       await request('DELETE', rowsPath(MAP[kind].table, id));
+      if (touched.size) await syncMediaPermissions(touched);
     } catch (err) {
+      if (touched.size) {
+        try { await syncMediaPermissions(touched); } catch (syncErr) {
+          console.error('Gagal memulihkan izin media setelah penghapusan gagal.', syncErr);
+        }
+      }
       if (err.status !== 404) throw err;
     }
   }
@@ -438,6 +517,9 @@
       const form = new FormData();
       form.append('fileId', 'unique()');
       form.append('file', item.blob, item.name || 'gambar.jpg');
+      form.append('permissions[]', 'read("' + TEAM + '")');
+      form.append('permissions[]', 'update("' + TEAM + '")');
+      form.append('permissions[]', 'delete("' + TEAM + '")');
       const file = await request('POST', '/storage/buckets/' + CFG.bucket + '/files', { form, timeout: 60000 });
       return mediaFromFile(file);
     },
