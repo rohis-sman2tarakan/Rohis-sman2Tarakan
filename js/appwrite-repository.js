@@ -563,7 +563,24 @@
       const data = await request('GET', '/storage/buckets/' + CFG.bucket + '/files', {
         queries: [Q.limit(100), Q.orderDesc('$createdAt')],
       });
-      return ((data && data.files) || []).map(mediaFromFile);
+      const files = ((data && data.files) || []).map(mediaFromFile);
+      return Promise.all(files.map(async (item) => {
+        // File previews are fetched with the authenticated project/team session.
+        // A blob URL is local to this admin tab and is never persisted as content.
+        try {
+          const headers = { 'X-Appwrite-Project': CFG.project };
+          const fb = readFallback();
+          if (fb) headers['X-Fallback-Cookies'] = fb;
+          const response = await fetch(item.url, { headers, credentials: 'omit', cache: 'no-store' });
+          if (!response.ok) throw new Error('Pratinjau media tidak dapat diakses (' + response.status + ').');
+          const blob = await response.blob();
+          item.dataUrl = URL.createObjectURL(blob);
+        } catch (err) {
+          item.dataUrl = '';
+          item.previewError = err.message || 'Pratinjau tidak tersedia.';
+        }
+        return item;
+      }));
     },
 
     async saveMedia(item) {
