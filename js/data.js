@@ -258,8 +258,16 @@
   // as image sources; anything else (javascript:, etc.) collapses to ''.
   function safeUrl(value) {
     const v = String(value == null ? '' : value).trim();
-    if (!v) return '';
-    if (/^(https?:|data:image\/(png|jpe?g|gif|webp|avif);base64,)/i.test(v)) return v;
+    if (!v || /[\u0000-\u001f\u007f"'\\\\<>]/.test(v)) return '';
+    if (/^https?:\/\//i.test(v)) {
+      try {
+        const parsed = new URL(v);
+        return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? v : '';
+      } catch (err) {
+        return '';
+      }
+    }
+    if (/^data:image\/(png|jpe?g|gif|webp|avif);base64,[a-z0-9+/=]+$/i.test(v)) return v;
     if (/^[a-z][a-z0-9+.-]*:/i.test(v) || v.startsWith('//')) return '';
     return v;
   }
