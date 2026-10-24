@@ -1,14 +1,10 @@
 /**
- * Content layer for the Rohis Al Ihsan website.
+ * Fallback content repository backed by seed JSON and localStorage.
  *
- * Public pages and the admin workspace never touch localStorage or
- * fetch() directly — they only call `ContentRepository`. Today that
- * repository is backed by JSON seed files + localStorage (so the
- * site keeps working as a static GitHub Pages deploy with a local
- * admin prototype). When a real backend is ready, swap
- * `LocalStorageRepository` for a `SupabaseRepository` implementing
- * the same async methods; nothing above this file needs to change.
- */
+ * js/appwrite-repository.js loads after this file and replaces the fallback
+ * with the Appwrite-backed repository. Public pages use Appwrite first and
+ * fall back to seed JSON when the service is unavailable. localStorage is a
+ * local fallback/cache, not the production source of truth. */
 
 (function (global) {
   const STORAGE_KEYS = {
