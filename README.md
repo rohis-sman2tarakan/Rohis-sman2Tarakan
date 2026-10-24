@@ -38,6 +38,10 @@ Website Rohis Al Ihsan SMAN 2 Tarakan. Static site (HTML + Tailwind hasil build 
     └── scripts/validate.js
 ```
 
+## Design system
+
+Situs memakai **Playfair Display** untuk judul editorial dan **Plus Jakarta Sans** untuk isi serta antarmuka. Token warna, tipografi, fokus keyboard, dan breakpoint dirawat di `css/style.css` dan `tailwind.config.js`. Jika konfigurasi Tailwind atau kelas utility berubah, bangun ulang stylesheet terkomit dengan `npm run build:css` dan pastikan hasilnya bersih pada CI. Halaman tetap menggunakan fallback font sistem jika Google Fonts tidak tersedia. CI membangun ulang stylesheet dan memastikan hasilnya identik dengan file yang dikomit.
+
 ## Menjalankan secara lokal
 
 Situs ini murni statis — jalankan server statis apa saja dari root folder, misalnya:
@@ -106,17 +110,17 @@ alih-alih dikarang. Isi melalui `/kelola/` → Pengaturan, atau langsung edit `d
 
 | Token     | Nilai      |
 |-----------|------------|
-| Forest    | `#2F5D3A`  |
-| Leaf      | `#3E7A45`  |
-| Sage      | `#7A9A7E`  |
-| Mist      | `#EAF2E3`  |
-| Ivory     | `#F7F9F3`  |
-| Charcoal  | `#22302A`  |
-| Muted     | `#5F6F64`  |
-| Line      | `#DCE6D5`  |
-| Surface   | `#EEF4E8`  |
+| Forest    | `#244632`  |
+| Leaf      | `#356947`  |
+| Sage      | `#78917A`  |
+| Mist      | `#E7EEE2`  |
+| Ivory     | `#F5F2E8`  |
+| Charcoal  | `#202A25`  |
+| Muted     | `#53645A`  |
+| Line      | `#D8E0D4`  |
+| Surface   | `#EDF1E8`  |
 
-Font saat ini: **Poppins** untuk headline dan antarmuka. Gunakan token CSS dan Tailwind yang sama ketika mengganti font pada perubahan terpisah; jangan mendokumentasikan font yang belum dimuat oleh situs.
+Font saat ini: **Playfair Display untuk judul dan Plus Jakarta Sans untuk isi serta UI** untuk headline dan antarmuka. Gunakan token CSS dan Tailwind yang sama ketika mengganti font pada perubahan terpisah; jangan mendokumentasikan font yang belum dimuat oleh situs.
 
 ## Build CSS
 

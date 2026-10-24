@@ -279,3 +279,56 @@ body[data-page="kelola"] {
   border-radius: 0.6rem;
   padding: 0.6rem 0.8rem;
 }
+
+
+/* Shared editorial design language; admin controls remain deliberately quiet. */
+body[data-page="kelola"] {
+  font-family: var(--font-ui);
+  color: var(--color-charcoal);
+  background:
+    radial-gradient(ellipse at 90% 0%, rgba(120, 145, 122, 0.12), transparent 34rem),
+    var(--color-ivory);
+}
+
+body[data-page="kelola"] h1,
+body[data-page="kelola"] h2,
+body[data-page="kelola"] h3,
+.login-title {
+  font-family: var(--font-display);
+  letter-spacing: -0.025em;
+}
+
+.admin-input:focus-visible,
+.admin-textarea:focus-visible,
+.admin-select:focus-visible,
+.admin-nav-link:focus-visible,
+.login-button:focus-visible {
+  outline: 3px solid #A66B22;
+  outline-offset: 2px;
+}
+
+.admin-input,
+.admin-textarea,
+.admin-select {
+  min-height: 44px;
+  border-color: var(--color-line);
+  border-radius: 0.75rem;
+}
+
+.admin-modal-backdrop {
+  padding: 1rem;
+}
+
+.login-card {
+  border-radius: 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .login-card {
+    padding: 1.5rem 1.15rem;
+  }
+
+  .admin-modal-backdrop {
+    padding: 0.75rem;
+  }
+}
