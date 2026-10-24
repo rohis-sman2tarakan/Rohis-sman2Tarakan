@@ -266,7 +266,7 @@
   function mediaIdsIn(value) {
     const ids = new Set();
     const text = String(value || '');
-    const pattern = /\/storage\/buckets\/media\/files\/([^/?#"'\\s]+)\/(?:view|preview|download)/g;
+    const pattern = /\/storage\/buckets\/media\/files\/([^/?#"'\s]+)\/(?:view|preview|download)/g;
     let match;
     while ((match = pattern.exec(text))) {
       try { ids.add(decodeURIComponent(match[1])); } catch (e) { /* abaikan URL tidak valid */ }
