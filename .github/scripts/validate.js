@@ -136,13 +136,20 @@ for (const htmlFile of listHtmlFiles(ROOT)) {
 for (const htmlFile of listHtmlFiles(ROOT)) {
   const rel = path.relative(ROOT, htmlFile);
   const content = fs.readFileSync(htmlFile, 'utf8');
-  if (!/<meta\s+http-equiv=["']Content-Security-Policy["']/i.test(content)) {
+  const csp = (content.match(/<meta\s+http-equiv=["']Content-Security-Policy["']\s+content=["']([^"']*)["']/i) || [])[1] || '';
+  if (!csp) {
     fail(rel + ' tidak memiliki Content Security Policy.');
+  } else {
+    for (const directive of ["default-src 'self'", "base-uri 'self'", "object-src 'none'", "script-src 'self'", "connect-src 'self' https://fra.cloud.appwrite.io"]) {
+      if (!csp.includes(directive)) fail(rel + ' CSP kehilangan direktif: ' + directive + '.');
+    }
   }
   const scriptTags = Array.from(content.matchAll(/<script\b([^>]*)>/gi));
   if (scriptTags.some((match) => !/\bsrc\s*=/.test(match[1]))) {
     fail(rel + ' memuat inline script; pindahkan ke file JS lokal agar CSP tetap ketat.');
   }
+  if (/\son[a-z]+\s*=/i.test(content)) fail(rel + ' memuat inline event handler yang melewati CSP.');
+  if (/href=["']\s*javascript:/i.test(content)) fail(rel + ' memuat javascript: URL pada tautan.');
 }
 
 // JS files must at least parse.
@@ -186,6 +193,34 @@ try {
   if (errors === 0) ok('Uji regresi escaping HTML dan allowlist URL lolos.');
 } catch (err) {
   fail('Uji keamanan helper gagal: ' + err.message);
+}
+
+// Appwrite row-permission policy tests (no network requests).
+try {
+  const browserWindow = { ContentRepository: {} };
+  const browserDocument = { body: { dataset: { page: 'kelola' } } };
+  const sandbox = {
+    window: browserWindow, document: browserDocument, console, URL, Date, Math,
+    fetch: () => Promise.reject(new Error('network must not be called in policy tests')),
+    localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+    sessionStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+    setTimeout, clearTimeout, AbortController, Event,
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'js', 'data.js'), 'utf8'), sandbox, { timeout: 1000 });
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'js', 'appwrite-repository.js'), 'utf8'), sandbox, { timeout: 1000 });
+  const policy = browserWindow.RohisBackend.permissionsFor;
+  const has = (list, value) => list.includes(value);
+  const published = policy('articles', { status: 'published' });
+  const draft = policy('articles', { status: 'draft' });
+  const active = policy('programs', { status: 'active' });
+  const inactive = policy('programs', { status: 'inactive' });
+  if (!has(published, 'read("any")') || !has(published, 'update("team:pengurus")') || !has(published, 'delete("team:pengurus")')) fail('Izin artikel published tidak sesuai kebijakan.');
+  if (!has(draft, 'read("team:pengurus")') || has(draft, 'read("any")')) fail('Izin artikel draft tidak dibatasi ke pengurus.');
+  if (!has(active, 'read("any")')) fail('Izin program aktif tidak dapat dibaca publik.');
+  if (!has(inactive, 'read("team:pengurus")') || has(inactive, 'read("any")')) fail('Izin program nonaktif tidak dibatasi ke pengurus.');
+  if (errors === 0) ok('Uji kebijakan izin baris Appwrite lolos.');
+} catch (err) {
+  fail('Uji kebijakan izin Appwrite gagal: ' + err.message);
 }
 
 // ---------------------------------------------------------------------
