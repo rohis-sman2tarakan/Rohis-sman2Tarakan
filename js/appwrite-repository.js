@@ -297,8 +297,22 @@
       }
     }
 
-    if (override && override.item && override.item.status === 'published') {
-      mediaIdsInItem(override.item).forEach((id) => publishedIds.add(id));
+    // Site settings (e.g. hero image) are public when referenced by the live site.
+    if (!(override && override.kind === 'site')) {
+      try {
+        const row = await request('GET', rowsPath('site', CFG.siteRow));
+        if (row && row.payload) mediaIdsIn(row.payload).forEach((id) => publishedIds.add(id));
+      } catch (err) {
+        if (err.status !== 404) throw err;
+      }
+    }
+
+    if (override && override.item) {
+      if (override.kind === 'site') {
+        mediaIdsIn(JSON.stringify(override.item)).forEach((id) => publishedIds.add(id));
+      } else if (override.item.status === 'published') {
+        mediaIdsInItem(override.item).forEach((id) => publishedIds.add(id));
+      }
     }
 
     for (const id of targets) {
@@ -468,13 +482,32 @@
     async saveSite(site) {
       const data = { payload: JSON.stringify(site) };
       const permissions = ['read("any")', 'update("' + TEAM + '")', 'delete("' + TEAM + '")'];
+      let previous = {};
       try {
-        await request('PATCH', rowsPath('site', CFG.siteRow), { json: { data, permissions } });
+        const row = await request('GET', rowsPath('site', CFG.siteRow));
+        previous = JSON.parse(row.payload || '{}');
       } catch (err) {
         if (err.status !== 404) throw err;
-        await request('POST', rowsPath('site'), { json: { rowId: CFG.siteRow, data, permissions } });
       }
-      return site;
+      const touched = mergeIds(mediaIdsIn(JSON.stringify(previous)), mediaIdsIn(JSON.stringify(site)));
+      if (touched.size) await syncMediaPermissions(touched, { kind: 'site', id: CFG.siteRow, item: null });
+      try {
+        try {
+          await request('PATCH', rowsPath('site', CFG.siteRow), { json: { data, permissions } });
+        } catch (err) {
+          if (err.status !== 404) throw err;
+          await request('POST', rowsPath('site'), { json: { rowId: CFG.siteRow, data, permissions } });
+        }
+        if (touched.size) await syncMediaPermissions(touched);
+        return site;
+      } catch (err) {
+        if (touched.size) {
+          try { await syncMediaPermissions(touched); } catch (syncErr) {
+            console.error('Gagal memulihkan izin media setelah pengaturan gagal.', syncErr);
+          }
+        }
+        throw err;
+      }
     },
 
     // ---- Program --------------------------------------------------------
