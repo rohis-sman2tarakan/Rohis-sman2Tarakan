@@ -377,7 +377,7 @@ select:focus-visible,
 }
 
 .motto-card {
-  background: linear-gradient(160deg, #EAF2E3 0%, #DCEBD3 100%);
+  background: linear-gradient(160deg, #E7EEE2 0%, #DCEBD3 100%);
   color: var(--color-forest);
   border-radius: 2rem;
   box-shadow: var(--shadow-soft);
@@ -515,7 +515,7 @@ a.card:hover,
 }
 
 .join-card {
-  background: linear-gradient(160deg, #3E7A45 0%, #2F5D3A 100%);
+  background: linear-gradient(160deg, #356947 0%, #244632 100%);
   color: #fff;
   border-radius: 2rem;
   box-shadow: var(--shadow-soft);
