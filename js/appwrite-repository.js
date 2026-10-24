@@ -100,9 +100,12 @@
     }
 
     let data = null;
-    const text = await res.text();
-    if (text) {
-      try { data = JSON.parse(text); } catch (e) { data = null; }
+    let responseText = '';
+    if (opts.responseType !== 'blob' || !res.ok) {
+      responseText = await res.text();
+      if (responseText) {
+        try { data = JSON.parse(responseText); } catch (e) { data = null; }
+      }
     }
 
     if (!res.ok) {
@@ -113,6 +116,7 @@
       }
       throw err;
     }
+    if (opts.responseType === 'blob') return res.blob();
     return data;
   }
 
@@ -568,12 +572,11 @@
         // File previews are fetched with the authenticated project/team session.
         // A blob URL is local to this admin tab and is never persisted as content.
         try {
-          const headers = { 'X-Appwrite-Project': CFG.project };
-          const fb = readFallback();
-          if (fb) headers['X-Fallback-Cookies'] = fb;
-          const response = await fetch(item.url, { headers, credentials: 'omit', cache: 'no-store' });
-          if (!response.ok) throw new Error('Pratinjau media tidak dapat diakses (' + response.status + ').');
-          const blob = await response.blob();
+          const blob = await request(
+            'GET',
+            '/storage/buckets/' + CFG.bucket + '/files/' + encodeURIComponent(item.id) + '/view',
+            { responseType: 'blob', silent401: false, timeout: 30000 }
+          );
           item.dataUrl = URL.createObjectURL(blob);
         } catch (err) {
           item.dataUrl = '';
