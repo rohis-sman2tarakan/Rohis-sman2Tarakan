@@ -136,7 +136,7 @@ for (const htmlFile of listHtmlFiles(ROOT)) {
 for (const htmlFile of listHtmlFiles(ROOT)) {
   const rel = path.relative(ROOT, htmlFile);
   const content = fs.readFileSync(htmlFile, 'utf8');
-  const csp = (content.match(/<meta\s+http-equiv=["']Content-Security-Policy["']\s+content=["']([^"']*)["']/i) || [])[1] || '';
+  const csp = (content.match(/<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]*)"/i) || [])[1] || '';
   if (!csp) {
     fail(rel + ' tidak memiliki Content Security Policy.');
   } else {
