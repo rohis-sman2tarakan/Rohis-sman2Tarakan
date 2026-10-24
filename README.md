@@ -82,6 +82,12 @@ Fitur:
 - **Program** — tambah/edit/hapus/aktifkan-nonaktifkan.
 - **Media** — unggah gambar ke Appwrite Storage (foto besar otomatis diperkecil ke
   ±1600px sebelum diunggah; batas 5 MB), pilih sebagai cover.
+- **Proteksi file media** — bucket memakai keamanan per file. File baru bersifat privat
+  dan hanya dapat dibaca tim `pengurus`; izin baca publik diberikan otomatis hanya saat
+  file dirujuk oleh kegiatan/tulisan berstatus terbit atau pengaturan situs yang aktif.
+  Saat konten diubah menjadi draf, cover dilepas, atau konten dihapus, izin file dihitung
+  ulang dari seluruh konten terbit yang masih merujuknya. File yang masih dipakai konten
+  terbit lain tetap publik. Jangan membagikan tautan langsung file privat kepada publik.
 - **Pengaturan** — identitas organisasi, teks hero, kontak, dan sosial media.
 
 Menambah pengurus: Appwrite Console → Auth → Teams → `pengurus` → Create membership
