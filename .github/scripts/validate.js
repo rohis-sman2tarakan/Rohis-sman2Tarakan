@@ -219,6 +219,20 @@ try {
   if (!has(active, 'read("any")')) fail('Izin program aktif tidak dapat dibaca publik.');
   if (!has(inactive, 'read("team:pengurus")') || has(inactive, 'read("any")')) fail('Izin program nonaktif tidak dibatasi ke pengurus.');
   if (errors === 0) ok('Uji kebijakan izin baris Appwrite lolos.');
+
+  const mediaIdsIn = browserWindow.RohisBackend.mediaIdsIn;
+  const mediaPermissionsFor = browserWindow.RohisBackend.mediaPermissionsFor;
+  const extracted = Array.from(mediaIdsIn(
+    'https://fra.cloud.appwrite.io/v1/storage/buckets/media/files/photo-123/view?project=abc ' +
+    '<img src="/v1/storage/buckets/media/files/photo_456/preview?project=abc"> ' +
+    'https://fra.cloud.appwrite.io/v1/storage/buckets/other/files/not-media/view'
+  ));
+  if (extracted.length !== 2 || !extracted.includes('photo-123') || !extracted.includes('photo_456')) fail('Ekstraksi ID media dari URL tidak sesuai.');
+  const privateFile = mediaPermissionsFor(false);
+  const publicFile = mediaPermissionsFor(true);
+  if (!privateFile.includes('read("team:pengurus")') || privateFile.includes('read("any")')) fail('File unggahan baru tidak privat secara default.');
+  if (!publicFile.includes('read("any")') || !publicFile.includes('update("team:pengurus")') || !publicFile.includes('delete("team:pengurus")')) fail('Izin file publik tidak sesuai kebijakan.');
+  if (errors === 0) ok('Uji regresi privasi file media lolos.');
 } catch (err) {
   fail('Uji kebijakan izin Appwrite gagal: ' + err.message);
 }
