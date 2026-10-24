@@ -38,6 +38,10 @@ Website Rohis Al Ihsan SMAN 2 Tarakan. Static site (HTML + Tailwind hasil build 
     └── scripts/validate.js
 ```
 
+## Design system
+
+Situs memakai **Playfair Display** untuk judul editorial dan **Plus Jakarta Sans** untuk isi serta antarmuka. Token warna, tipografi, fokus keyboard, dan breakpoint dirawat di `css/style.css` dan `tailwind.config.js`. Jika konfigurasi Tailwind atau kelas utility berubah, bangun ulang stylesheet terkomit dengan `npm run build:css` dan pastikan hasilnya bersih pada CI. Halaman tetap menggunakan fallback font sistem jika Google Fonts tidak tersedia.
+
 ## Menjalankan secara lokal
 
 Situs ini murni statis — jalankan server statis apa saja dari root folder, misalnya:
