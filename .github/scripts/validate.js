@@ -163,6 +163,8 @@ try {
   if (util.escapeHtml('<img src=x onerror="alert(1)">') !== '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;') fail('RohisUtil.escapeHtml tidak meng-escape markup berbahaya.');
   if (util.safeUrl('javascript:alert(1)') !== '') fail('RohisUtil.safeUrl menerima javascript: URL.');
   if (util.safeUrl('data:image/svg+xml,<svg onload=alert(1)>') !== '') fail('RohisUtil.safeUrl menerima SVG data URL.');
+  if (util.safeUrl('x\") ; background-image:url(https://evil.example/x)') !== '') fail('RohisUtil.safeUrl menerima karakter yang berbahaya dalam konteks CSS.');
+  if (util.safeUrl('relative\npath.jpg') !== '') fail('RohisUtil.safeUrl menerima karakter kontrol.');
   if (util.safeUrl('https://example.com/image.webp') !== 'https://example.com/image.webp') fail('RohisUtil.safeUrl menolak HTTPS yang valid.');
   if (util.safeUrl('../assets/images/hero-rumah-lamin.jpg') !== '../assets/images/hero-rumah-lamin.jpg') fail('RohisUtil.safeUrl menolak path relatif yang valid.');
   if (errors === 0) ok('Uji regresi escaping HTML dan allowlist URL lolos.');
