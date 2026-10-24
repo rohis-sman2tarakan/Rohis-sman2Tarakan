@@ -387,7 +387,7 @@
     // Fail closed on unpublish/cover removal: adjust file access before the
     // content write, then restore permissions from persisted content on error.
     if (item.id && touched.size) {
-      await syncMediaPermissions(touched, { kind, id: item.id, item: data });
+      await syncMediaPermissions(touched, { kind, id: item.id, item: null });
     }
 
     try {
