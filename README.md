@@ -120,7 +120,7 @@ alih-alih dikarang. Isi melalui `/kelola/` → Pengaturan, atau langsung edit `d
 | Line      | `#DCE6D5`  |
 | Surface   | `#EEF4E8`  |
 
-Font saat ini: **Poppins** untuk headline dan antarmuka. Gunakan token CSS dan Tailwind yang sama ketika mengganti font pada perubahan terpisah; jangan mendokumentasikan font yang belum dimuat oleh situs.
+Font saat ini: **Playfair Display and Plus Jakarta Sans** untuk headline dan antarmuka. Gunakan token CSS dan Tailwind yang sama ketika mengganti font pada perubahan terpisah; jangan mendokumentasikan font yang belum dimuat oleh situs.
 
 ## Build CSS
 
