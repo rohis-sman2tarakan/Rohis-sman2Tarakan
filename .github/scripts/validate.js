@@ -162,6 +162,9 @@ try {
   const util = browserWindow.RohisUtil;
   if (util.escapeHtml('<img src=x onerror="alert(1)">') !== '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;') fail('RohisUtil.escapeHtml tidak meng-escape markup berbahaya.');
   if (util.safeUrl('javascript:alert(1)') !== '') fail('RohisUtil.safeUrl menerima javascript: URL.');
+  if (util.safeUrl('//evil.example/image.png') !== '') fail('RohisUtil.safeUrl menerima protocol-relative URL.');
+  if (util.safeUrl('https:evil.example') !== '') fail('RohisUtil.safeUrl menerima URL HTTPS yang tidak absolut.');
+  if (util.safeUrl('https://example.com/a\\\\b.png') !== '') fail('RohisUtil.safeUrl menerima backslash pada URL.');
   if (util.safeUrl('data:image/svg+xml,<svg onload=alert(1)>') !== '') fail('RohisUtil.safeUrl menerima SVG data URL.');
   if (util.safeUrl('x\") ; background-image:url(https://evil.example/x)') !== '') fail('RohisUtil.safeUrl menerima karakter yang berbahaya dalam konteks CSS.');
   if (util.safeUrl('relative\npath.jpg') !== '') fail('RohisUtil.safeUrl menerima karakter kontrol.');
