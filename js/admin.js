@@ -43,9 +43,11 @@
   }
 
   function badge(status, activeLabel, inactiveLabel) {
-    const isActive = status === 'published' || status === 'active';
+    const allowedStatuses = new Set(['published', 'draft', 'active', 'inactive']);
+    const safeStatus = allowedStatuses.has(status) ? status : 'unknown';
+    const isActive = safeStatus === 'published' || safeStatus === 'active';
     const label = isActive ? activeLabel : inactiveLabel;
-    return `<span class="admin-badge status-${status}">${label}</span>`;
+    return `<span class="admin-badge status-${safeStatus}">${label}</span>`;
   }
 
   // --------------------------------------------------------------------
