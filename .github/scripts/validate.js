@@ -132,6 +132,18 @@ for (const htmlFile of listHtmlFiles(ROOT)) {
   }
 }
 
+// Every HTML entry point must carry the baseline Content Security Policy.
+for (const htmlFile of listHtmlFiles(ROOT)) {
+  const rel = path.relative(ROOT, htmlFile);
+  const content = fs.readFileSync(htmlFile, 'utf8');
+  if (!/<meta\\s+http-equiv=["']Content-Security-Policy["']/i.test(content)) {
+    fail(`${rel} tidak memiliki Content Security Policy.`);
+  }
+  if (/<script(?![^>]*\\bsrc=)[^>]*>/i.test(content)) {
+    fail(`${rel} memuat inline script; pindahkan ke file JS lokal agar CSP tetap ketat.`);
+  }
+}
+
 // JS files must at least parse.
 for (const f of ['app.js', 'admin.js', 'data.js', 'hero-light.js', 'night-house.js', 'appwrite-repository.js']) {
   try {
