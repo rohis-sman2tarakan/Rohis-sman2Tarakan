@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 let errors = 0;
@@ -81,6 +82,12 @@ for (const [file, fields] of Object.entries(REQUIRED_FIELDS)) {
     if (item.status && !['draft', 'published', 'active', 'inactive'].includes(item.status)) {
       fail(`data/${file}[${i}] memiliki status tidak dikenal: "${item.status}".`);
     }
+    if (item.status === 'published') {
+      const publicText = [item.title, item.excerpt, item.content].filter(Boolean).join(' ');
+      if (/(isi lengkap tulisan ini akan segera|akan segera dilengkapi|lorem ipsum|placeholder)/i.test(publicText)) {
+        fail(`data/${file}[${i}] berstatus published tetapi masih mengandung teks placeholder.`);
+      }
+    }
   });
 }
 
@@ -144,6 +151,24 @@ if (canonical) {
 }
 
 ok('Pemeriksaan tautan internal (root-relative) selesai.');
+
+
+// Security regression checks for shared escaping and URL allowlist.
+try {
+  const browserWindow = {};
+  const browserDocument = { currentScript: null, body: { dataset: {} } };
+  const sandbox = { window: browserWindow, document: browserDocument, console, URL, Date, Math, fetch: () => Promise.reject(new Error('not called')), localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} }, sessionStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} } };
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'js', 'data.js'), 'utf8'), sandbox, { timeout: 1000 });
+  const util = browserWindow.RohisUtil;
+  if (util.escapeHtml('<img src=x onerror="alert(1)">') !== '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;') fail('RohisUtil.escapeHtml tidak meng-escape markup berbahaya.');
+  if (util.safeUrl('javascript:alert(1)') !== '') fail('RohisUtil.safeUrl menerima javascript: URL.');
+  if (util.safeUrl('data:image/svg+xml,<svg onload=alert(1)>') !== '') fail('RohisUtil.safeUrl menerima SVG data URL.');
+  if (util.safeUrl('https://example.com/image.webp') !== 'https://example.com/image.webp') fail('RohisUtil.safeUrl menolak HTTPS yang valid.');
+  if (util.safeUrl('../assets/images/hero-rumah-lamin.jpg') !== '../assets/images/hero-rumah-lamin.jpg') fail('RohisUtil.safeUrl menolak path relatif yang valid.');
+  if (errors === 0) ok('Uji regresi escaping HTML dan allowlist URL lolos.');
+} catch (err) {
+  fail('Uji keamanan helper gagal: ' + err.message);
+}
 
 // ---------------------------------------------------------------------
 if (errors > 0) {
