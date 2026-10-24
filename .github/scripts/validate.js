@@ -136,11 +136,12 @@ for (const htmlFile of listHtmlFiles(ROOT)) {
 for (const htmlFile of listHtmlFiles(ROOT)) {
   const rel = path.relative(ROOT, htmlFile);
   const content = fs.readFileSync(htmlFile, 'utf8');
-  if (!/<meta\\s+http-equiv=["']Content-Security-Policy["']/i.test(content)) {
-    fail(`${rel} tidak memiliki Content Security Policy.`);
+  if (!/<meta\s+http-equiv=["']Content-Security-Policy["']/i.test(content)) {
+    fail(rel + ' tidak memiliki Content Security Policy.');
   }
-  if (/<script(?![^>]*\\bsrc=)[^>]*>/i.test(content)) {
-    fail(`${rel} memuat inline script; pindahkan ke file JS lokal agar CSP tetap ketat.`);
+  const scriptTags = Array.from(content.matchAll(/<script\b([^>]*)>/gi));
+  if (scriptTags.some((match) => !/\bsrc\s*=/.test(match[1]))) {
+    fail(rel + ' memuat inline script; pindahkan ke file JS lokal agar CSP tetap ketat.');
   }
 }
 
