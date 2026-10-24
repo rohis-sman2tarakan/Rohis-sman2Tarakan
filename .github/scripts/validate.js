@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 let errors = 0;
@@ -81,6 +82,12 @@ for (const [file, fields] of Object.entries(REQUIRED_FIELDS)) {
     if (item.status && !['draft', 'published', 'active', 'inactive'].includes(item.status)) {
       fail(`data/${file}[${i}] memiliki status tidak dikenal: "${item.status}".`);
     }
+    if (item.status === 'published') {
+      const publicText = [item.title, item.excerpt, item.content].filter(Boolean).join(' ');
+      if (/(isi lengkap tulisan ini akan segera|akan segera dilengkapi|lorem ipsum|placeholder)/i.test(publicText)) {
+        fail(`data/${file}[${i}] berstatus published tetapi masih mengandung teks placeholder.`);
+      }
+    }
   });
 }
 
@@ -125,6 +132,26 @@ for (const htmlFile of listHtmlFiles(ROOT)) {
   }
 }
 
+// Every HTML entry point must carry the baseline Content Security Policy.
+for (const htmlFile of listHtmlFiles(ROOT)) {
+  const rel = path.relative(ROOT, htmlFile);
+  const content = fs.readFileSync(htmlFile, 'utf8');
+  const csp = (content.match(/<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]*)"/i) || [])[1] || '';
+  if (!csp) {
+    fail(rel + ' tidak memiliki Content Security Policy.');
+  } else {
+    for (const directive of ["default-src 'self'", "base-uri 'self'", "object-src 'none'", "script-src 'self'", "connect-src 'self' https://fra.cloud.appwrite.io"]) {
+      if (!csp.includes(directive)) fail(rel + ' CSP kehilangan direktif: ' + directive + '.');
+    }
+  }
+  const scriptTags = Array.from(content.matchAll(/<script\b([^>]*)>/gi));
+  if (scriptTags.some((match) => !/\bsrc\s*=/.test(match[1]))) {
+    fail(rel + ' memuat inline script; pindahkan ke file JS lokal agar CSP tetap ketat.');
+  }
+  if (/\son[a-z]+\s*=/i.test(content)) fail(rel + ' memuat inline event handler yang melewati CSP.');
+  if (/href=["']\s*javascript:/i.test(content)) fail(rel + ' memuat javascript: URL pada tautan.');
+}
+
 // JS files must at least parse.
 for (const f of ['app.js', 'admin.js', 'data.js', 'hero-light.js', 'night-house.js', 'appwrite-repository.js']) {
   try {
@@ -144,6 +171,71 @@ if (canonical) {
 }
 
 ok('Pemeriksaan tautan internal (root-relative) selesai.');
+
+
+// Security regression checks for shared escaping and URL allowlist.
+try {
+  const browserWindow = {};
+  const browserDocument = { currentScript: null, body: { dataset: {} } };
+  const sandbox = { window: browserWindow, document: browserDocument, console, URL, Date, Math, fetch: () => Promise.reject(new Error('not called')), localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} }, sessionStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} } };
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'js', 'data.js'), 'utf8'), sandbox, { timeout: 1000 });
+  const util = browserWindow.RohisUtil;
+  if (util.escapeHtml('<img src=x onerror="alert(1)">') !== '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;') fail('RohisUtil.escapeHtml tidak meng-escape markup berbahaya.');
+  if (util.safeUrl('javascript:alert(1)') !== '') fail('RohisUtil.safeUrl menerima javascript: URL.');
+  if (util.safeUrl('//evil.example/image.png') !== '') fail('RohisUtil.safeUrl menerima protocol-relative URL.');
+  if (util.safeUrl('https:evil.example') !== '') fail('RohisUtil.safeUrl menerima URL HTTPS yang tidak absolut.');
+  if (util.safeUrl('https://example.com/a' + String.fromCharCode(92) + 'b.png') !== '') fail('RohisUtil.safeUrl menerima backslash pada URL.');
+  if (util.safeUrl('data:image/svg+xml,<svg onload=alert(1)>') !== '') fail('RohisUtil.safeUrl menerima SVG data URL.');
+  if (util.safeUrl('x\") ; background-image:url(https://evil.example/x)') !== '') fail('RohisUtil.safeUrl menerima karakter yang berbahaya dalam konteks CSS.');
+  if (util.safeUrl('relative\npath.jpg') !== '') fail('RohisUtil.safeUrl menerima karakter kontrol.');
+  if (util.safeUrl('https://example.com/image.webp') !== 'https://example.com/image.webp') fail('RohisUtil.safeUrl menolak HTTPS yang valid.');
+  if (util.safeUrl('../assets/images/hero-rumah-lamin.jpg') !== '../assets/images/hero-rumah-lamin.jpg') fail('RohisUtil.safeUrl menolak path relatif yang valid.');
+  if (errors === 0) ok('Uji regresi escaping HTML dan allowlist URL lolos.');
+} catch (err) {
+  fail('Uji keamanan helper gagal: ' + err.message);
+}
+
+// Appwrite row-permission policy tests (no network requests).
+try {
+  const browserWindow = { ContentRepository: {} };
+  const browserDocument = { body: { dataset: { page: 'kelola' } } };
+  const sandbox = {
+    window: browserWindow, document: browserDocument, console, URL, Date, Math,
+    fetch: () => Promise.reject(new Error('network must not be called in policy tests')),
+    localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+    sessionStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+    setTimeout, clearTimeout, AbortController, Event,
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'js', 'data.js'), 'utf8'), sandbox, { timeout: 1000 });
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'js', 'appwrite-repository.js'), 'utf8'), sandbox, { timeout: 1000 });
+  const policy = browserWindow.RohisBackend.permissionsFor;
+  const has = (list, value) => list.includes(value);
+  const published = policy('articles', { status: 'published' });
+  const draft = policy('articles', { status: 'draft' });
+  const active = policy('programs', { status: 'active' });
+  const inactive = policy('programs', { status: 'inactive' });
+  if (!has(published, 'read("any")') || !has(published, 'update("team:pengurus")') || !has(published, 'delete("team:pengurus")')) fail('Izin artikel published tidak sesuai kebijakan.');
+  if (!has(draft, 'read("team:pengurus")') || has(draft, 'read("any")')) fail('Izin artikel draft tidak dibatasi ke pengurus.');
+  if (!has(active, 'read("any")')) fail('Izin program aktif tidak dapat dibaca publik.');
+  if (!has(inactive, 'read("team:pengurus")') || has(inactive, 'read("any")')) fail('Izin program nonaktif tidak dibatasi ke pengurus.');
+  if (errors === 0) ok('Uji kebijakan izin baris Appwrite lolos.');
+
+  const mediaIdsIn = browserWindow.RohisBackend.mediaIdsIn;
+  const mediaPermissionsFor = browserWindow.RohisBackend.mediaPermissionsFor;
+  const extracted = Array.from(mediaIdsIn(
+    'https://fra.cloud.appwrite.io/v1/storage/buckets/media/files/photo-123/view?project=abc ' +
+    '<img src="/v1/storage/buckets/media/files/photo_456/preview?project=abc"> ' +
+    'https://fra.cloud.appwrite.io/v1/storage/buckets/other/files/not-media/view'
+  ));
+  if (extracted.length !== 2 || !extracted.includes('photo-123') || !extracted.includes('photo_456')) fail('Ekstraksi ID media dari URL tidak sesuai.');
+  const privateFile = mediaPermissionsFor(false);
+  const publicFile = mediaPermissionsFor(true);
+  if (!privateFile.includes('read("team:pengurus")') || privateFile.includes('read("any")')) fail('File unggahan baru tidak privat secara default.');
+  if (!publicFile.includes('read("any")') || !publicFile.includes('update("team:pengurus")') || !publicFile.includes('delete("team:pengurus")')) fail('Izin file publik tidak sesuai kebijakan.');
+  if (errors === 0) ok('Uji regresi privasi file media lolos.');
+} catch (err) {
+  fail('Uji kebijakan izin Appwrite gagal: ' + err.message);
+}
 
 // ---------------------------------------------------------------------
 if (errors > 0) {

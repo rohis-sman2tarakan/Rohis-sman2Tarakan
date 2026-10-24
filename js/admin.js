@@ -43,9 +43,11 @@
   }
 
   function badge(status, activeLabel, inactiveLabel) {
-    const isActive = status === 'published' || status === 'active';
+    const allowedStatuses = new Set(['published', 'draft', 'active', 'inactive']);
+    const safeStatus = allowedStatuses.has(status) ? status : 'unknown';
+    const isActive = safeStatus === 'published' || safeStatus === 'active';
     const label = isActive ? activeLabel : inactiveLabel;
-    return `<span class="admin-badge status-${status}">${label}</span>`;
+    return `<span class="admin-badge status-${safeStatus}">${label}</span>`;
   }
 
   // --------------------------------------------------------------------
@@ -521,17 +523,24 @@
   }
 
   function mediaThumbHTML(item, selectable) {
+    const rawPreview = String(item.dataUrl || '');
+    // Blob URLs are created locally after an authenticated media fetch.
+    const preview = /^blob:https?:/i.test(rawPreview) ? rawPreview : RohisUtil.safeUrl(rawPreview);
     return `
       <div class="border border-line rounded-lg overflow-hidden group relative" data-media-id="${esc(item.id)}">
-        <img src="${esc(RohisUtil.safeUrl(item.dataUrl))}" alt="${esc(item.name)}" class="w-full aspect-square object-cover ${selectable ? 'cursor-pointer' : ''}" ${selectable ? 'data-select="1"' : ''}>
         ${
-          selectable
-            ? ''
-            : `<div class="p-2">
-                <p class="text-xs truncate">${esc(item.name)}</p>
-                <button type="button" class="text-xs text-red-700 mt-1" data-delete-media="${esc(item.id)}">Hapus</button>
-              </div>`
+          preview
+            ? `<img src="${esc(preview)}" alt="${esc(item.name)}" class="w-full aspect-square object-cover ${selectable ? 'cursor-pointer' : ''}" ${selectable ? 'data-select="1"' : ''}>`
+            : `<div class="w-full aspect-square flex items-center justify-center bg-sage/20 text-muted text-xs p-3 text-center">${esc(item.previewError || 'Pratinjau tidak tersedia')}</div>`
         }
+        <div class="p-2">
+          <p class="text-xs truncate">${esc(item.name)}</p>
+          ${
+            selectable
+              ? (preview ? '' : '<p class="text-xs text-muted mt-1">Tidak dapat dipilih tanpa pratinjau.</p>')
+              : `<button type="button" class="text-xs text-red-700 mt-1" data-delete-media="${esc(item.id)}">Hapus</button>`
+          }
+        </div>
       </div>`;
   }
 
@@ -569,8 +578,11 @@
           toast('Gambar terlalu besar (maks 5 MB).');
           return;
         }
-        await ContentRepository.saveMedia(prepared);
-        toast('Gambar diunggah.');
+        const uploaded = await ContentRepository.saveMedia(prepared);
+        if (uploaded && uploaded.previewUrl) {
+          try { URL.revokeObjectURL(uploaded.previewUrl); } catch (err) { /* abaikan */ }
+        }
+        toast('Gambar diunggah secara privat. Pilih sebagai cover lalu terbitkan konten untuk membuka akses publik.');
         loadMediaList();
       } catch (err) {
         toast('Gagal mengunggah: ' + RohisAuth.friendly(err));
@@ -594,8 +606,8 @@
           img.addEventListener('click', () => {
             const wrapper = img.closest('[data-media-id]');
             const item = media.find((m) => m.id === wrapper.dataset.mediaId);
-            if (item && mediaPickerTargetId) {
-              qs(`#${mediaPickerTargetId}`).value = item.dataUrl;
+            if (item && mediaPickerTargetId && item.url) {
+              qs(`#${mediaPickerTargetId}`).value = item.url;
             }
             closeMediaPicker();
           });

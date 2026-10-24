@@ -82,6 +82,12 @@ Fitur:
 - **Program** — tambah/edit/hapus/aktifkan-nonaktifkan.
 - **Media** — unggah gambar ke Appwrite Storage (foto besar otomatis diperkecil ke
   ±1600px sebelum diunggah; batas 5 MB), pilih sebagai cover.
+- **Proteksi file media** — bucket memakai keamanan per file. File baru bersifat privat
+  dan hanya dapat dibaca tim `pengurus`; izin baca publik diberikan otomatis hanya saat
+  file dirujuk oleh kegiatan/tulisan berstatus terbit atau pengaturan situs yang aktif.
+  Saat konten diubah menjadi draf, cover dilepas, atau konten dihapus, izin file dihitung
+  ulang dari seluruh konten terbit yang masih merujuknya. File yang masih dipakai konten
+  terbit lain tetap publik. Jangan membagikan tautan langsung file privat kepada publik.
 - **Pengaturan** — identitas organisasi, teks hero, kontak, dan sosial media.
 
 Menambah pengurus: Appwrite Console → Auth → Teams → `pengurus` → Create membership
@@ -100,14 +106,17 @@ alih-alih dikarang. Isi melalui `/kelola/` → Pengaturan, atau langsung edit `d
 
 | Token     | Nilai      |
 |-----------|------------|
-| Forest    | `#234233`  |
-| Ivory     | `#FBFBF9`  |
-| Charcoal  | `#1E211F`  |
-| Muted     | `#6E736F`  |
-| Line      | `#E5E3DE`  |
+| Forest    | `#2F5D3A`  |
+| Leaf      | `#3E7A45`  |
+| Sage      | `#7A9A7E`  |
+| Mist      | `#EAF2E3`  |
+| Ivory     | `#F7F9F3`  |
+| Charcoal  | `#22302A`  |
+| Muted     | `#5F6F64`  |
+| Line      | `#DCE6D5`  |
+| Surface   | `#EEF4E8`  |
 
-Font display: **Playfair Display** (headline, judul artikel). Font UI: **Plus Jakarta Sans**
-(body, navigasi, form, admin).
+Font saat ini: **Poppins** untuk headline dan antarmuka. Gunakan token CSS dan Tailwind yang sama ketika mengganti font pada perubahan terpisah; jangan mendokumentasikan font yang belum dimuat oleh situs.
 
 ## Build CSS
 
