@@ -287,8 +287,25 @@
     if (!targets.length) return;
 
     const publishedIds = new Set();
+    // Scan all rows before changing any permissions. Never make a decision from
+    // a truncated sample: if the safety cap is reached, fail closed.
+    async function listAllRowsForMedia(table) {
+      const out = [];
+      let cursor = null;
+      const maxPages = 100;
+      for (let page = 0; page < maxPages; page++) {
+        const queries = [Q.limit(PAGE)];
+        if (cursor) queries.push(Q.cursorAfter(cursor));
+        const data = await request('GET', rowsPath(table), { queries });
+        const rows = (data && data.rows) || [];
+        out.push.apply(out, rows);
+        if (rows.length < PAGE) return out;
+        cursor = rows[rows.length - 1].$id;
+      }
+      throw new Error('Terlalu banyak konten untuk memverifikasi izin media dengan aman.');
+    }
     for (const kind of ['activities', 'articles']) {
-      const rows = await listRows(MAP[kind].table);
+      const rows = await listAllRowsForMedia(MAP[kind].table);
       for (const row of rows) {
         if (override && override.kind === kind && override.id === row.$id) continue;
         if (row.status === 'published') {
