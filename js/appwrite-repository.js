@@ -247,8 +247,8 @@
           sortOrder: Math.round(Number(p.order) || 0),
         };
       },
-      // Program nonaktif tetap disaring oleh halaman publik.
-      published: () => true,
+      // Hanya program aktif yang dibaca publik; program nonaktif khusus pengurus.
+      published: (p) => p.status === 'active',
     },
   };
 
@@ -390,7 +390,7 @@
       const data = { payload: JSON.stringify(site) };
       const permissions = ['read("any")', 'update("' + TEAM + '")', 'delete("' + TEAM + '")'];
       try {
-        await request('PATCH', rowsPath('site', CFG.siteRow), { json: { data } });
+        await request('PATCH', rowsPath('site', CFG.siteRow), { json: { data, permissions } });
       } catch (err) {
         if (err.status !== 404) throw err;
         await request('POST', rowsPath('site'), { json: { rowId: CFG.siteRow, data, permissions } });
