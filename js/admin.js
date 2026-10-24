@@ -523,7 +523,9 @@
   }
 
   function mediaThumbHTML(item, selectable) {
-    const preview = item.dataUrl ? RohisUtil.safeUrl(item.dataUrl) : '';
+    const rawPreview = String(item.dataUrl || '');
+    // Blob URLs are created locally after an authenticated media fetch.
+    const preview = /^blob:https?:/i.test(rawPreview) ? rawPreview : RohisUtil.safeUrl(rawPreview);
     return `
       <div class="border border-line rounded-lg overflow-hidden group relative" data-media-id="${esc(item.id)}">
         ${
