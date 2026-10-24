@@ -282,6 +282,14 @@
     return new Set([].concat(...Array.from(arguments, (value) => Array.from(value || []))));
   }
 
+  function mediaPermissionsFor(isPublic) {
+    return [
+      isPublic ? 'read("any")' : 'read("' + TEAM + '")',
+      'update("' + TEAM + '")',
+      'delete("' + TEAM + '")',
+    ];
+  }
+
   async function syncMediaPermissions(ids, override) {
     const targets = Array.from(new Set(ids || [])).filter((id) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/.test(id));
     if (!targets.length) return;
@@ -333,11 +341,7 @@
     }
 
     for (const id of targets) {
-      const permissions = [
-        publishedIds.has(id) ? 'read("any")' : 'read("' + TEAM + '")',
-        'update("' + TEAM + '")',
-        'delete("' + TEAM + '")',
-      ];
+      const permissions = mediaPermissionsFor(publishedIds.has(id));
       await request('PATCH', '/storage/buckets/' + CFG.bucket + '/files/' + encodeURIComponent(id), {
         json: { permissions },
       });
@@ -665,5 +669,5 @@
 
   global.ContentRepository = repo;
   global.RohisAuth = Auth;
-  global.RohisBackend = { config: CFG, ApiError, makeRowId, permissionsFor };
+  global.RohisBackend = { config: CFG, ApiError, makeRowId, permissionsFor, mediaIdsIn, mediaPermissionsFor };
 })(window);
