@@ -35,6 +35,17 @@
     toast._t = setTimeout(() => el.classList.remove('is-visible'), 2200);
   }
 
+  // Repository calls from buttons can fail (offline, expired session, no
+  // permission); surface that instead of leaving an unhandled rejection.
+  async function attempt(failMessage, task) {
+    try {
+      await task();
+    } catch (err) {
+      console.error(failMessage, err);
+      toast(failMessage + ': ' + RohisAuth.friendly(err));
+    }
+  }
+
   function formatDate(dateStr) {
     if (!dateStr) return '—';
     const d = new Date(dateStr);
@@ -187,11 +198,12 @@
     qsa('[data-preview]', list).forEach((btn) => btn.addEventListener('click', () => previewSavedActivity(btn.dataset.preview)));
     qsa('[data-delete]', list).forEach((btn) =>
       btn.addEventListener('click', async () => {
-        if (confirm('Hapus kegiatan ini? Tindakan ini tidak dapat dibatalkan.')) {
+        if (!confirm('Hapus kegiatan ini? Tindakan ini tidak dapat dibatalkan.')) return;
+        await attempt('Gagal menghapus kegiatan', async () => {
           await ContentRepository.deleteActivity(btn.dataset.delete);
           toast('Kegiatan dihapus.');
           loadActivityList();
-        }
+        });
       })
     );
   });
@@ -302,11 +314,12 @@
     qsa('[data-preview]', list).forEach((btn) => btn.addEventListener('click', () => previewSavedArticle(btn.dataset.preview)));
     qsa('[data-delete]', list).forEach((btn) =>
       btn.addEventListener('click', async () => {
-        if (confirm('Hapus tulisan ini? Tindakan ini tidak dapat dibatalkan.')) {
+        if (!confirm('Hapus tulisan ini? Tindakan ini tidak dapat dibatalkan.')) return;
+        await attempt('Gagal menghapus tulisan', async () => {
           await ContentRepository.deleteArticle(btn.dataset.delete);
           toast('Tulisan dihapus.');
           loadArticleList();
-        }
+        });
       })
     );
   });
@@ -418,18 +431,21 @@
     qsa('[data-toggle]', list).forEach((btn) =>
       btn.addEventListener('click', async () => {
         const program = programs.find((p) => p.id === btn.dataset.toggle);
-        program.status = program.status === 'active' ? 'inactive' : 'active';
-        await ContentRepository.saveProgram(program);
-        loadProgramList();
+        const nextStatus = program.status === 'active' ? 'inactive' : 'active';
+        await attempt('Gagal mengubah status program', async () => {
+          await ContentRepository.saveProgram({ ...program, status: nextStatus });
+          loadProgramList();
+        });
       })
     );
     qsa('[data-delete]', list).forEach((btn) =>
       btn.addEventListener('click', async () => {
-        if (confirm('Hapus program ini?')) {
+        if (!confirm('Hapus program ini?')) return;
+        await attempt('Gagal menghapus program', async () => {
           await ContentRepository.deleteProgram(btn.dataset.delete);
           toast('Program dihapus.');
           loadProgramList();
-        }
+        });
       })
     );
   });
@@ -484,7 +500,7 @@
   }
 
   // --------------------------------------------------------------------
-  // Media library (prototype: dataURL stored in localStorage)
+  // Media library (files live in the Appwrite storage bucket)
   // --------------------------------------------------------------------
   const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // batas bucket
   const MAX_EDGE = 1600; // sisi terpanjang setelah diperkecil (px)
@@ -500,13 +516,13 @@
     let bitmap = null;
     try {
       bitmap = await createImageBitmap(file);
-    } catch (err) {
+    } catch {
       bitmap = null;
     }
     if (!bitmap) return { blob: file, name: file.name };
     const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
     if (scale === 1 && file.size <= KEEP_AS_IS_BYTES) {
-      bitmap.close && bitmap.close();
+      if (bitmap.close) bitmap.close();
       return { blob: file, name: file.name };
     }
     const canvas = document.createElement('canvas');
@@ -516,7 +532,7 @@
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close && bitmap.close();
+    if (bitmap.close) bitmap.close();
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.86));
     if (!blob) return { blob: file, name: file.name };
     return { blob, name: baseName + '.jpg' };
@@ -554,10 +570,11 @@
 
     qsa('[data-delete-media]', list).forEach((btn) =>
       btn.addEventListener('click', async () => {
-        if (confirm('Hapus gambar ini dari media library?')) {
+        if (!confirm('Hapus gambar ini dari media library?')) return;
+        await attempt('Gagal menghapus gambar', async () => {
           await ContentRepository.deleteMedia(btn.dataset.deleteMedia);
           loadMediaList();
-        }
+        });
       })
     );
   });
@@ -567,7 +584,7 @@
       const file = e.target.files[0];
       e.target.value = '';
       if (!file) return;
-      if (!/^image\//.test(file.type)) {
+      if (!file.type.startsWith('image/')) {
         toast('Hanya file gambar yang bisa diunggah.');
         return;
       }
@@ -580,7 +597,7 @@
         }
         const uploaded = await ContentRepository.saveMedia(prepared);
         if (uploaded && uploaded.previewUrl) {
-          try { URL.revokeObjectURL(uploaded.previewUrl); } catch (err) { /* abaikan */ }
+          try { URL.revokeObjectURL(uploaded.previewUrl); } catch { /* abaikan */ }
         }
         toast('Gambar diunggah secara privat. Pilih sebagai cover lalu terbitkan konten untuk membuka akses publik.');
         loadMediaList();
@@ -597,7 +614,11 @@
     qsa('[data-action="pick-media"]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         mediaPickerTargetId = btn.dataset.targetInput;
-        const media = await ContentRepository.getMedia();
+        let media;
+        await attempt('Gagal memuat media', async () => {
+          media = await ContentRepository.getMedia();
+        });
+        if (!media) return;
         const grid = qs('[data-list="media-picker-grid"]');
         const empty = qs('[data-empty="media-picker"]');
         grid.innerHTML = media.map((m) => mediaThumbHTML(m, true)).join('');
@@ -664,7 +685,7 @@
   }
 
   // --------------------------------------------------------------------
-  // Data export (download current localStorage content as data/*.json)
+  // Data export (download current content as data/*.json)
   // --------------------------------------------------------------------
   function initDataExport() {
     const getters = {
@@ -677,7 +698,11 @@
     qsa('[data-export]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const key = btn.dataset.export;
-        const data = await getters[key]();
+        let data;
+        await attempt('Gagal mengekspor data', async () => {
+          data = await getters[key]();
+        });
+        if (!data) return;
         const blob = new Blob([JSON.stringify(data, null, 2) + '\n'], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

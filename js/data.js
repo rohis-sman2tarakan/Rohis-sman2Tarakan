@@ -233,7 +233,7 @@
       try {
         const raw = sessionStorage.getItem(`rohis:preview:${type}`);
         return raw ? JSON.parse(raw) : null;
-      } catch (err) {
+      } catch {
         return null;
       }
     }
@@ -259,7 +259,7 @@
       try {
         const parsed = new URL(v);
         return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? v : '';
-      } catch (err) {
+      } catch {
         return '';
       }
     }

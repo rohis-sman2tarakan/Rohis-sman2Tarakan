@@ -47,13 +47,13 @@
   }
 
   function readFallback() {
-    try { return localStorage.getItem(FALLBACK_KEY) || ''; } catch (e) { return ''; }
+    try { return localStorage.getItem(FALLBACK_KEY) || ''; } catch { return ''; }
   }
   function saveFallback(value) {
-    try { localStorage.setItem(FALLBACK_KEY, value); } catch (e) { /* abaikan */ }
+    try { localStorage.setItem(FALLBACK_KEY, value); } catch { /* abaikan */ }
   }
   function clearFallback() {
-    try { localStorage.removeItem(FALLBACK_KEY); } catch (e) { /* abaikan */ }
+    try { localStorage.removeItem(FALLBACK_KEY); } catch { /* abaikan */ }
   }
 
   async function request(method, path, opts) {
@@ -86,7 +86,7 @@
         credentials: 'omit',
         cache: IS_ADMIN ? 'no-store' : 'default',
       });
-    } catch (err) {
+    } catch {
       const e = new ApiError(0, 'Tidak bisa terhubung ke server.', 'network');
       e.network = true;
       throw e;
@@ -104,7 +104,7 @@
     if (opts.responseType !== 'blob' || !res.ok) {
       responseText = await res.text();
       if (responseText) {
-        try { data = JSON.parse(responseText); } catch (e) { data = null; }
+        try { data = JSON.parse(responseText); } catch { data = null; }
       }
     }
 
@@ -273,7 +273,7 @@
     const pattern = /\/storage\/buckets\/media\/files\/([^/?#"'\s]+)\/(?:view|preview|download)/g;
     let match;
     while ((match = pattern.exec(text))) {
-      try { ids.add(decodeURIComponent(match[1])); } catch (e) { /* abaikan URL tidak valid */ }
+      try { ids.add(decodeURIComponent(match[1])); } catch { /* abaikan URL tidak valid */ }
     }
     return ids;
   }
@@ -682,7 +682,7 @@
     async logout() {
       try {
         await request('DELETE', '/account/sessions/current', { silent401: true });
-      } catch (err) { /* sesi mungkin sudah habis */ }
+      } catch { /* sesi mungkin sudah habis */ }
       clearFallback();
     },
   };
