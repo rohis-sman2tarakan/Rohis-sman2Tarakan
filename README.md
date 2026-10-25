@@ -136,3 +136,11 @@ lalu commit `css/tailwind.css`. CI akan gagal jika file ini tidak sinkron.
 ## Catatan data
 
 Situs publik membaca dari Appwrite dan memakai `data/*.json` hanya sebagai cadangan. Perubahan di `/kelola/` langsung terlihat oleh pengunjung tanpa commit.
+
+## Tab bar mobile (Lottie)
+
+Di layar < 768px, navigasi utama berupa tab bar melayang di bawah (`#tab-bar`, `js/tabbar.js`).
+Pil yang bergeser adalah animasi Lottie (`assets/lottie/tab-pill.json`, dimainkan oleh
+`js/vendor/lottie_light.min.js`, hanya dimuat di HP). Ikon dan label adalah tautan HTML biasa.
+Jika Lottie gagal dimuat, CSS menampilkan pil cadangan. Mode "kurangi gerakan" melewati animasi.
+Lihat `js/vendor/NOTICE.txt` untuk asal file dan lisensi.

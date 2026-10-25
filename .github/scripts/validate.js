@@ -153,7 +153,7 @@ for (const htmlFile of listHtmlFiles(ROOT)) {
 }
 
 // JS files must at least parse.
-for (const f of ['app.js', 'admin.js', 'data.js', 'hero-light.js', 'night-house.js', 'appwrite-repository.js']) {
+for (const f of ['app.js', 'admin.js', 'data.js', 'hero-light.js', 'night-house.js', 'appwrite-repository.js', 'tabbar.js']) {
   try {
     new (require('vm').Script)(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), { filename: f });
   } catch (err) {

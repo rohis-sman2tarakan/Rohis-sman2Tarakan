@@ -1,0 +1,5 @@
+lottie_light.min.js — lottie-web 5.12.2 (https://github.com/airbnb/lottie-web), MIT License.
+Copyright (c) Airbnb. Self-hosted copy of build/player/lottie_light.min.js (SVG renderer only).
+
+assets/lottie/tab-pill.json is derived from "Interactive iOS 26 inspired tab menu" (.lottie
+supplied by the site owner): icon/label layers removed, recolored to the site's green palette.

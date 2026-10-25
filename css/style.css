@@ -820,3 +820,99 @@ main > header, main > section { scroll-margin-top: 6rem; }
 }
 @media (min-width: 768px) { .hero h1 { max-width: 15ch; } }
 @media (prefers-reduced-motion: reduce) { .hero::after { animation: none !important; } }
+
+/* ---------------------------------------------------------------- */
+/* Mobile tab bar (Lottie pill + HTML links)                          */
+/* ---------------------------------------------------------------- */
+
+.tab-bar {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .tab-bar {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    z-index: 50;
+    width: min(92vw, 420px);
+    margin-inline: auto;
+    aspect-ratio: 740 / 124;
+    border-radius: 9999px;
+    background: var(--color-forest);
+    box-shadow: 0 14px 30px -10px rgba(20, 60, 30, 0.45), 0 4px 10px -4px rgba(20, 60, 30, 0.3);
+  }
+
+  /* The Lottie draws its own bar once it has loaded. */
+  .tab-bar.has-lottie {
+    background: transparent;
+  }
+
+  .tab-bar-anim {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .tab-bar-anim svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .tab-bar-links {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    padding: 0 3.5%;
+  }
+
+  .tab-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border-radius: 9999px;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 250ms ease;
+  }
+
+  .tab-link.is-active {
+    color: #fff;
+  }
+
+  .tab-bar:not(.has-lottie) .tab-link.is-active {
+    background: rgba(255, 255, 255, 0.16);
+  }
+
+  .tab-link:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: -3px;
+  }
+
+  /* Phone navigation lives in the tab bar, so the hamburger is redundant. */
+  .site-nav #nav-toggle {
+    display: none;
+  }
+
+  /* Keep the footer content clear of the floating bar. */
+  .site-footer {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-link {
+    transition: none;
+  }
+}
