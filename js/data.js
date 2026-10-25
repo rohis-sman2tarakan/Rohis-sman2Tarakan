@@ -1,14 +1,10 @@
 /**
- * Content layer for the Rohis Al Ihsan website.
+ * Fallback content repository backed by seed JSON and localStorage.
  *
- * Public pages and the admin workspace never touch localStorage or
- * fetch() directly — they only call `ContentRepository`. Today that
- * repository is backed by JSON seed files + localStorage (so the
- * site keeps working as a static GitHub Pages deploy with a local
- * admin prototype). When a real backend is ready, swap
- * `LocalStorageRepository` for a `SupabaseRepository` implementing
- * the same async methods; nothing above this file needs to change.
- */
+ * js/appwrite-repository.js loads after this file and replaces the fallback
+ * with the Appwrite-backed repository. Public pages use Appwrite first and
+ * fall back to seed JSON when the service is unavailable. localStorage is a
+ * local fallback/cache, not the production source of truth. */
 
 (function (global) {
   const STORAGE_KEYS = {
@@ -258,11 +254,28 @@
   // as image sources; anything else (javascript:, etc.) collapses to ''.
   function safeUrl(value) {
     const v = String(value == null ? '' : value).trim();
-    if (!v) return '';
-    if (/^(https?:|data:image\/(png|jpe?g|gif|webp|avif);base64,)/i.test(v)) return v;
+    if (!v || /[\u0000-\u001f\u007f"'\\\\<>]/.test(v)) return '';
+    if (/^https?:\/\//i.test(v)) {
+      try {
+        const parsed = new URL(v);
+        return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? v : '';
+      } catch (err) {
+        return '';
+      }
+    }
+    if (/^data:image\/(png|jpe?g|gif|webp|avif);base64,[a-z0-9+/=]+$/i.test(v)) return v;
     if (/^[a-z][a-z0-9+.-]*:/i.test(v) || v.startsWith('//')) return '';
     return v;
   }
 
-  global.RohisUtil = { slugify, escapeHtml, safeUrl };
+  // Periode kepengurusan. Diisi manual jika ada; jika kosong, otomatis dari
+  // tahun pada tanggal (pergantian pengurus biasanya Desember-Januari).
+  function periodOf(item) {
+    const manual = String((item && item.period) || '').trim();
+    if (manual) return manual;
+    const year = String((item && item.date) || '').slice(0, 4);
+    return /^\d{4}$/.test(year) ? year : '';
+  }
+
+  global.RohisUtil = { slugify, escapeHtml, safeUrl, periodOf };
 })(window);

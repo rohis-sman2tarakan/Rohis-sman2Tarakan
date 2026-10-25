@@ -3,18 +3,53 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' https: data: blob:; connect-src 'self' https://fra.cloud.appwrite.io; form-action 'self' https:; upgrade-insecure-requests">
   <title>Kelola — Rohis Al Ihsan</title>
   <meta name="robots" content="noindex, nofollow">
-  <meta name="theme-color" content="#2F5D3A">
+  <meta name="theme-color" content="#244632">
   <link rel="icon" type="image/png" href="../assets/images/logo-rohis-sman2tarakan.png">
   <link rel="stylesheet" href="../css/tailwind.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../css/style.css">
   <link rel="stylesheet" href="../css/admin.css">
 </head>
 <body class="selection:bg-forest selection:text-white" data-page="kelola">
+
+  <!-- Layar masuk: menutup seluruh halaman sampai pengurus berhasil login -->
+  <div id="login-gate" class="login-gate" role="dialog" aria-modal="true" aria-labelledby="login-title">
+    <div class="login-card">
+      <img src="../assets/images/logo-rohis-sman2tarakan.png" alt="" width="56" height="55" class="login-logo">
+      <p class="login-eyebrow">Kelola Website</p>
+      <h1 id="login-title" class="login-title">Masuk Pengurus</h1>
+
+      <p class="login-note" data-login-state="loading">Memeriksa sesi&hellip;</p>
+
+      <form class="login-form" data-login-state="email" hidden novalidate>
+        <p class="login-note">Masukkan email pengurus. Kami kirim kode 6 angka ke email itu.</p>
+        <label class="login-label" for="login-email">Email</label>
+        <input id="login-email" name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" required class="admin-input">
+        <button type="submit" class="login-button">Kirim kode</button>
+      </form>
+
+      <form class="login-form" data-login-state="code" hidden novalidate>
+        <p class="login-note">Kode sudah dikirim ke <strong data-login-email></strong>. Periksa kotak masuk atau folder spam.</p>
+        <label class="login-label" for="login-code">Kode 6 angka</label>
+        <input id="login-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="12" required class="admin-input login-code">
+        <button type="submit" class="login-button">Masuk</button>
+        <button type="button" class="login-link" data-login-back>Pakai email lain</button>
+      </form>
+
+      <div class="login-form" data-login-state="denied" hidden>
+        <p class="login-note"><strong data-login-email></strong> belum terdaftar sebagai pengurus. Minta pengelola menambahkan email ini, lalu coba lagi.</p>
+        <button type="button" class="login-button" data-login-logout>Pakai email lain</button>
+      </div>
+
+      <p class="login-error" role="alert" data-login-error hidden></p>
+      <a href="../" class="login-link login-home">&larr; Kembali ke situs</a>
+    </div>
+  </div>
 
   <a class="skip-link" href="#admin-main">Lewati ke konten utama</a>
 
@@ -45,8 +80,10 @@
         <a href="#media" class="admin-nav-link" data-nav-view="media">Media</a>
         <a href="#pengaturan" class="admin-nav-link" data-nav-view="pengaturan">Pengaturan</a>
       </nav>
-      <div class="mt-auto pt-8 hidden md:block">
-        <a href="../" class="text-xs text-muted hover:text-forest">&larr; Kembali ke situs publik</a>
+      <div class="mt-auto pt-8">
+        <p class="text-xs text-muted truncate" data-user-email></p>
+        <button type="button" class="text-xs text-muted hover:text-forest underline mt-1" data-action="logout">Keluar</button>
+        <a href="../" class="hidden md:block text-xs text-muted hover:text-forest mt-4">&larr; Kembali ke situs publik</a>
       </div>
     </aside>
 
@@ -114,6 +151,10 @@
                 <label class="admin-label" for="activity-category">Kategori</label>
                 <input class="admin-input" id="activity-category" name="category" placeholder="Kajian, Aksi Sosial, ...">
               </div>
+            </div>
+            <div>
+              <label class="admin-label" for="activity-period">Periode kepengurusan</label>
+              <input class="admin-input" id="activity-period" name="period" maxlength="20" placeholder="Kosongkan = otomatis dari tahun tanggal (mis. 2026)">
             </div>
             <div>
               <label class="admin-label" for="activity-excerpt">Ringkasan</label>
@@ -187,6 +228,10 @@
             <div>
               <label class="admin-label" for="article-category">Kategori</label>
               <input class="admin-input" id="article-category" name="category" placeholder="Akhlak, Pelajar, Islam, Digital, ...">
+            </div>
+            <div>
+              <label class="admin-label" for="article-period">Periode kepengurusan</label>
+              <input class="admin-input" id="article-period" name="period" maxlength="20" placeholder="Kosongkan = otomatis dari tahun tanggal (mis. 2026)">
             </div>
             <div>
               <label class="admin-label" for="article-cover">Cover</label>
@@ -271,7 +316,7 @@
         <div class="flex items-center justify-between mb-2">
           <h1 class="font-serif-custom text-3xl">Media</h1>
         </div>
-        <p class="text-sm text-muted mb-6 max-w-lg">Prototipe lokal — gambar disimpan di browser ini saja (belum ada penyimpanan terpusat). Gunakan gambar berukuran kecil.</p>
+        <p class="text-sm text-muted mb-6 max-w-lg">Unggahan baru bersifat privat. Gambar hanya dapat diakses publik setelah digunakan pada konten yang diterbitkan. Foto dari iPad otomatis diperkecil sebelum diunggah.</p>
         <label class="tap-target inline-flex items-center gap-2 border border-forest text-forest px-5 py-2.5 rounded-full text-sm font-medium hover:bg-forest hover:text-white transition cursor-pointer mb-8">
           <span>+ Unggah Gambar</span>
           <input type="file" accept="image/*" class="hidden" data-action="upload-media">
@@ -363,9 +408,8 @@
         <div class="max-w-2xl mt-14 pt-10 border-t border-line">
           <h2 class="font-serif-custom text-lg mb-2">Ekspor Data</h2>
           <p class="text-sm text-muted mb-6 max-w-lg">
-            Perubahan di halaman ini hanya tersimpan di browser Anda. Untuk membuat perubahan
-            terlihat oleh semua pengunjung situs, unduh file di bawah lalu ganti file yang sama
-            di folder <code>data/</code> pada repository (lewat GitHub, atau kirim ke pengelola teknis).
+            Perubahan di halaman ini tersimpan di server dan langsung terlihat oleh pengunjung.
+            Unduhan di bawah hanya untuk cadangan: salinan data saat ini dalam format JSON.
           </p>
           <div class="flex flex-wrap gap-3">
             <button type="button" class="tap-target text-sm px-4 py-2.5 border border-line rounded-full hover:border-forest" data-export="site">Unduh site.json</button>
@@ -394,6 +438,7 @@
   <div id="admin-toast" class="admin-toast" role="status" aria-live="polite"></div>
 
   <script src="../js/data.js"></script>
+  <script src="../js/appwrite-repository.js"></script>
   <script src="../js/admin.js"></script>
 </body>
 </html>

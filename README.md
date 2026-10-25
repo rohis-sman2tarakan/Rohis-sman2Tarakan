@@ -13,7 +13,7 @@ Website Rohis Al Ihsan SMAN 2 Tarakan. Static site (HTML + Tailwind hasil build 
 ├── tulisan-detail.html     Detail tulisan (?id=...)
 ├── tentang.html            Tentang kami
 │
-├── kelola/                 Admin workspace (prototype lokal, lihat di bawah)
+├── kelola/                 Admin workspace (login pengurus, lihat di bawah)
 │   └── index.html
 │
 ├── data/                   Content layer — sumber data situs publik
@@ -27,7 +27,8 @@ Website Rohis Al Ihsan SMAN 2 Tarakan. Static site (HTML + Tailwind hasil build 
 │   └── admin.css           Style khusus admin workspace
 │
 ├── js/
-│   ├── data.js              ContentRepository — satu-satunya jalur akses data
+│   ├── data.js              ContentRepository dasar (membaca data/*.json)
+│   ├── appwrite-repository.js  ContentRepository ke Appwrite + login pengurus
 │   ├── app.js                Rendering & interaksi situs publik
 │   ├── admin.js              Logika admin workspace (CRUD, preview, settings)
 │   (tailwind.config.js di root = design tokens; css/tailwind.css = hasil build, wajib di-commit)
@@ -36,6 +37,10 @@ Website Rohis Al Ihsan SMAN 2 Tarakan. Static site (HTML + Tailwind hasil build 
     ├── workflows/validate.yml   CI: validasi JSON, field wajib, tautan internal
     └── scripts/validate.js
 ```
+
+## Design system
+
+Situs memakai **Playfair Display** untuk judul editorial dan **Plus Jakarta Sans** untuk isi serta antarmuka. Token warna, tipografi, fokus keyboard, dan breakpoint dirawat di `css/style.css` dan `tailwind.config.js`. Jika konfigurasi Tailwind atau kelas utility berubah, bangun ulang stylesheet terkomit dengan `npm run build:css` dan pastikan hasilnya bersih pada CI. Halaman tetap menggunakan fallback font sistem jika Google Fonts tidak tersedia. CI membangun ulang stylesheet dan memastikan hasilnya identik dengan file yang dikomit.
 
 ## Menjalankan secara lokal
 
@@ -48,55 +53,52 @@ python3 -m http.server 8000
 
 ## Content layer & arsitektur data
 
-Semua halaman publik dan admin workspace **hanya** berbicara dengan `ContentRepository`
-(`js/data.js`) — tidak pernah memanggil `fetch()` atau `localStorage` secara langsung.
-
-Cara kerja `LocalStorageRepository` (implementasi saat ini):
-
-1. Saat pertama kali dibuka, data dibaca dari `data/*.json` (seed data di repo ini).
-2. Data tersebut disalin ke `localStorage` sebagai working copy.
-3. Admin workspace membaca/menulis working copy ini melalui `ContentRepository`.
-
-Ini berarti perubahan yang dibuat lewat `/kelola/` **tersimpan lokal di browser
-tersebut saja** — belum tersinkron ke semua pengunjung situs. Ini disengaja untuk
-fase sekarang (lihat bagian Admin Workspace di bawah).
-
-### Migrasi ke backend nanti
+Semua halaman publik dan Kelola hanya berbicara dengan `ContentRepository`
+(`js/data.js` + `js/appwrite-repository.js`) — tidak memanggil `fetch()` atau
+`localStorage` untuk konten secara langsung.
 
 ```
-SEKARANG                          NANTI
-JSON / localStorage                Supabase (Auth, DB, Storage)
-       │                                  │
-       ▼                                  ▼
-  ContentRepository  ────────────►  ContentRepository (impl baru)
-       │                                  │
-       ▼                                  ▼
-   Public UI / Admin UI  (tidak berubah sama sekali)
+Halaman publik ──► Appwrite (baca, tanpa login)  ──gagal──► data/*.json
+Kelola          ──► Appwrite (login kode email, tulis hanya tim `pengurus`)
 ```
 
-Untuk migrasi: buat class baru (mis. `SupabaseRepository`) yang mengimplementasikan
-method async yang sama (`getSite`, `saveActivity`, `deleteArticle`, dst.), lalu ganti
-baris `global.ContentRepository = new LocalStorageRepository()` di `js/data.js`.
-Tidak ada kode UI yang perlu disentuh.
+- **Sumber data utama: Appwrite** (project `6ace47c90031991e50c8`, wilayah Frankfurt,
+  database `rohis`, tabel `site`, `programs`, `activities`, `articles`, bucket `media`).
+- **`data/*.json` = data awal dan cadangan.** Halaman publik memakainya otomatis jika
+  Appwrite tidak terjangkau. Perubahan lewat Kelola tidak mengubah file ini; gunakan
+  tombol unduh di Kelola → Pengaturan jika ingin salinan cadangan.
+- Tidak ada rahasia di kode. Project ID dan endpoint memang publik; yang menjaga data
+  adalah izin di Appwrite: baca terbuka hanya untuk baris terbit, tulis hanya untuk tim
+  `pengurus`, dan draf hanya terbaca oleh tim itu.
+- Domain situs terdaftar sebagai Web platform di Appwrite
+  (`rohis-sman2tarakan.github.io`). Domain baru perlu didaftarkan juga.
 
 ## Admin Workspace (`/kelola/`)
 
-**Ini adalah prototipe lokal/statis, bukan sistem produksi.** Tidak ada autentikasi,
-tidak ada password hard-coded, tidak ada backend. Siapa pun yang membuka `/kelola/`
-di browser mereka bisa mengedit — perubahan hanya tersimpan di browser itu.
+Login memakai **kode 6 angka yang dikirim ke email** (tanpa password). Hanya email yang
+sudah menjadi anggota tim `pengurus` di Appwrite yang bisa menulis; email lain bisa
+meminta kode tetapi ditolak dan tidak bisa mengubah apa pun.
 
 Fitur:
 
-- **Dashboard** — jumlah kegiatan/tulisan/program/media aktual (bukan angka statis) + aktivitas terbaru.
-- **Kegiatan** — tambah/edit/hapus, status draft/published, preview.
-- **Tulisan** — tambah/edit/hapus, simpan draft atau terbitkan, preview.
-- **Program** — tambah/edit/hapus/aktifkan-nonaktifkan; dibaca langsung oleh beranda.
-- **Media** — unggah gambar (disimpan sebagai data URL di `localStorage`, maksimum
-  ~350KB per gambar untuk fase prototipe ini), pilih gambar untuk cover kegiatan/tulisan.
-- **Pengaturan** — ubah identitas organisasi, teks hero, dan tautan kontak/sosial media.
+- **Dashboard** — jumlah kegiatan/tulisan/program/media dan aktivitas terbaru.
+- **Kegiatan** dan **Tulisan** — tambah/edit/hapus, draf atau terbitkan, pratinjau. Setiap item punya **Periode kepengurusan** (kolom `period`); jika dikosongkan, otomatis dari tahun tanggal (pergantian pengurus biasanya Desember–Januari). Halaman publik menampilkan periode terbaru lebih dulu, dengan pilihan periode sebelumnya sebagai arsip.
+- **Program** — tambah/edit/hapus/aktifkan-nonaktifkan.
+- **Media** — unggah gambar ke Appwrite Storage (foto besar otomatis diperkecil ke
+  ±1600px sebelum diunggah; batas 5 MB), pilih sebagai cover.
+- **Proteksi file media** — bucket memakai keamanan per file. File baru bersifat privat
+  dan hanya dapat dibaca tim `pengurus`; izin baca publik diberikan otomatis hanya saat
+  file dirujuk oleh kegiatan/tulisan berstatus terbit atau pengaturan situs yang aktif.
+  Saat konten diubah menjadi draf, cover dilepas, atau konten dihapus, izin file dihitung
+  ulang dari seluruh konten terbit yang masih merujuknya. File yang masih dipakai konten
+  terbit lain tetap publik. Jangan membagikan tautan langsung file privat kepada publik.
+- **Pengaturan** — identitas organisasi, teks hero, kontak, dan sosial media.
 
-Preview membuka halaman publik yang sama persis (bukan tampilan admin) di tab baru,
-membaca draft sementara dari `sessionStorage` — belum tersimpan sampai ditekan Simpan.
+Menambah pengurus: Appwrite Console → Auth → Teams → `pengurus` → Create membership
+(atau minta pengelola teknis).
+
+Pratinjau membuka halaman publik yang sama persis di tab baru, membaca draf sementara
+dari `sessionStorage` — belum tersimpan sampai ditekan Simpan.
 
 ## Data placeholder
 
@@ -108,14 +110,17 @@ alih-alih dikarang. Isi melalui `/kelola/` → Pengaturan, atau langsung edit `d
 
 | Token     | Nilai      |
 |-----------|------------|
-| Forest    | `#234233`  |
-| Ivory     | `#FBFBF9`  |
-| Charcoal  | `#1E211F`  |
-| Muted     | `#6E736F`  |
-| Line      | `#E5E3DE`  |
+| Forest    | `#244632`  |
+| Leaf      | `#356947`  |
+| Sage      | `#78917A`  |
+| Mist      | `#E7EEE2`  |
+| Ivory     | `#F5F2E8`  |
+| Charcoal  | `#202A25`  |
+| Muted     | `#53645A`  |
+| Line      | `#D8E0D4`  |
+| Surface   | `#EDF1E8`  |
 
-Font display: **Playfair Display** (headline, judul artikel). Font UI: **Plus Jakarta Sans**
-(body, navigasi, form, admin).
+Font saat ini: **Playfair Display untuk judul dan Plus Jakarta Sans untuk isi serta UI** untuk headline dan antarmuka. Gunakan token CSS dan Tailwind yang sama ketika mengganti font pada perubahan terpisah; jangan mendokumentasikan font yang belum dimuat oleh situs.
 
 ## Build CSS
 
@@ -130,7 +135,7 @@ lalu commit `css/tailwind.css`. CI akan gagal jika file ini tidak sinkron.
 
 ## Catatan data
 
-Situs publik selalu membaca `data/*.json`. Perubahan di `/kelola/` hanya tersimpan di browser pengurus; gunakan tombol ekspor lalu commit file JSON agar tampil untuk semua pengunjung.
+Situs publik membaca dari Appwrite dan memakai `data/*.json` hanya sebagai cadangan. Perubahan di `/kelola/` langsung terlihat oleh pengunjung tanpa commit.
 
 ## Tab bar mobile (Lottie)
 

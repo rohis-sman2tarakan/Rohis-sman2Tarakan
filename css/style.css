@@ -6,25 +6,28 @@
 */
 
 :root {
-  --color-forest: #2F5D3A;
-  --color-leaf: #3E7A45;
-  --color-sage: #7A9A7E;
-  --color-mist: #EAF2E3;
-  --color-ivory: #F7F9F3;
-  --color-charcoal: #22302A;
-  --color-muted: #5F6F64;
-  --color-line: #DCE6D5;
-  --color-surface: #EEF4E8;
+  --color-forest: #244632;
+  --color-leaf: #356947;
+  --color-sage: #78917A;
+  --color-mist: #E7EEE2;
+  --color-ivory: #F5F2E8;
+  --color-charcoal: #202A25;
+  --color-muted: #53645A;
+  --color-line: #D8E0D4;
+  --color-surface: #EDF1E8;
 
-  --font-display: 'Poppins', system-ui, sans-serif;
+  --font-display: 'Playfair Display', Georgia, serif;
   --shadow-soft: 0 10px 30px -12px rgba(47, 93, 58, 0.25);
-  --font-ui: 'Poppins', system-ui, sans-serif;
+  --font-ui: 'Plus Jakarta Sans', system-ui, sans-serif;
 
   --ease-editorial: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html {
   scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /*
@@ -59,11 +62,15 @@ body {
   color: var(--color-charcoal);
 }
 
-.font-serif-custom {
+h1, h2, h3, .section-title, .font-serif-custom {
   font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  text-wrap: pretty;
 }
+
+.font-serif-custom { font-weight: 600; }
+p, li { text-wrap: pretty; }
 
 /* Fade out before leaving to another page (see initPageTransitions). */
 html.is-leaving body {
@@ -163,13 +170,13 @@ select:focus-visible,
 }
 
 .btn-solid {
-  background-color: var(--color-leaf);
+  background-color: var(--color-forest);
   color: #fff;
-  box-shadow: 0 6px 16px -6px rgba(47, 93, 58, 0.55);
+  box-shadow: 0 6px 16px -6px rgba(36, 70, 50, 0.38);
 }
 
 .btn-solid:hover {
-  background-color: var(--color-forest);
+  background-color: #193624;
   transform: translateY(-1px);
 }
 
@@ -212,7 +219,7 @@ select:focus-visible,
 }
 
 .hero.has-photo {
-  min-height: 34rem;
+  min-height: clamp(31rem, 72svh, 42rem);
 }
 
 .hero.has-photo .hero-bg {
@@ -224,6 +231,31 @@ select:focus-visible,
   display: none;
 }
 
+/* Cahaya pagi (js/hero-light.js): sinar lembut di dalam .hero-bg + debu emas di canvas. */
+.hero-rays {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  filter: blur(3px);
+  opacity: 0.48;
+  animation: rays-sway 34s ease-in-out infinite alternate;
+}
+
+.hero-dust {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+}
+
+@keyframes rays-sway {
+  from { transform: rotate(-0.6deg); opacity: 0.68; }
+  to { transform: rotate(0.6deg); opacity: 0.85; }
+}
+
 /* Warm light that slowly "breathes" over the sunrise. */
 .hero::after {
   content: '';
@@ -232,8 +264,8 @@ select:focus-visible,
   z-index: -1;
   pointer-events: none;
   background: radial-gradient(48% 55% at 74% 18%, rgba(255, 214, 130, 0.55) 0%, rgba(255, 214, 130, 0) 70%);
-  opacity: 0.35;
-  animation: sun-breathe 8s ease-in-out infinite alternate;
+  opacity: 0.24;
+  animation: sun-breathe 12s ease-in-out infinite alternate;
 }
 
 /* Hero copy rises in one piece at a time once content has rendered. */
@@ -252,8 +284,8 @@ select:focus-visible,
 }
 
 @keyframes sun-breathe {
-  from { opacity: 0.1; }
-  to { opacity: 0.9; }
+  from { opacity: 0.16; }
+  to { opacity: 0.38; }
 }
 
 @keyframes rise-in {
@@ -345,7 +377,7 @@ select:focus-visible,
 }
 
 .motto-card {
-  background: linear-gradient(160deg, #EAF2E3 0%, #DCEBD3 100%);
+  background: linear-gradient(160deg, #E7EEE2 0%, #DCEBD3 100%);
   color: var(--color-forest);
   border-radius: 2rem;
   box-shadow: var(--shadow-soft);
@@ -414,6 +446,10 @@ select:focus-visible,
 }
 
 a.card:hover,
+.is-filtered-out {
+  display: none !important;
+}
+
 .card.is-hoverable:hover {
   transform: translateY(-4px);
   box-shadow: 0 18px 36px -14px rgba(47, 93, 58, 0.38);
@@ -479,7 +515,7 @@ a.card:hover,
 }
 
 .join-card {
-  background: linear-gradient(160deg, #3E7A45 0%, #2F5D3A 100%);
+  background: linear-gradient(160deg, #356947 0%, #244632 100%);
   color: #fff;
   border-radius: 2rem;
   box-shadow: var(--shadow-soft);
@@ -513,6 +549,138 @@ a.card:hover,
   background: rgba(255, 255, 255, 0.95);
   padding: 0.5rem 0.9rem;
   border-radius: 1.25rem;
+}
+
+/* ---------------------------------------------------------------- */
+/* Perjalanan waktu: latar halaman + rumah malam di footer           */
+/* (js/night-house.js). Foto = aset hero yang sama.                  */
+/* ---------------------------------------------------------------- */
+
+.journey-tint {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  will-change: opacity;
+}
+
+.journey-warm {
+  background: linear-gradient(180deg, #FAEACB 0%, #F5E1BE 100%);
+  opacity: var(--journey-warm, 0);
+}
+
+/* Cahaya matahari sore yang ikut turun di sudut kanan atas layar. */
+.journey-glow {
+  background: radial-gradient(70% 60% at 88% 4%, rgba(255, 205, 120, 0.55) 0%, rgba(255, 205, 120, 0) 70%);
+  opacity: var(--journey-glow, 0);
+}
+
+.journey-dusk {
+  background: linear-gradient(180deg, #F4D9CC 0%, #E8D6E6 55%, #DCD8EE 100%);
+  opacity: var(--journey-dusk, 0);
+}
+
+.journey-blue {
+  background: linear-gradient(180deg, #DDE4F2 0%, #CED8EE 100%);
+  opacity: var(--journey-blue, 0);
+}
+
+/* Pita hijau muda dibuat tembus agar perubahan warna terasa di seluruh halaman. */
+.journey-on .section-mist {
+  background-color: rgba(234, 242, 227, 0.5);
+}
+
+.site-footer.has-night {
+  overflow: hidden;
+  background: linear-gradient(180deg, #24354D 0%, #253A4C 38%, var(--color-forest) 100%) var(--color-forest);
+}
+
+.night-house {
+  position: relative;
+  margin: 0;
+  width: 100%;
+  aspect-ratio: 16 / 7;
+  max-height: 520px;
+  overflow: hidden;
+  isolation: isolate;
+  /* Foto memudar langsung ke latar footer: tanpa garis batas. */
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 62%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 62%, transparent 100%);
+}
+
+.night-house img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: 42% 35%;
+  filter: brightness(0.92) saturate(0.88) contrast(1.02);
+}
+
+@media (max-width: 640px) {
+  .night-house {
+    aspect-ratio: 4 / 3;
+  }
+}
+
+.nh-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  will-change: opacity;
+}
+
+.nh-dusk {
+  background: linear-gradient(180deg, #F6B48E 0%, #E2A0A0 45%, #A58DBB 100%);
+  mix-blend-mode: multiply;
+  opacity: calc(var(--nh-dusk, 0) * 0.7);
+}
+
+.nh-night {
+  background: linear-gradient(180deg, #5C74B8 0%, #6A7FBA 50%, #56689F 100%);
+  mix-blend-mode: multiply;
+  opacity: calc(var(--nh-night, 1) * 0.85);
+}
+
+.nh-silver {
+  background:
+    radial-gradient(circle at var(--nh-moon-x, 74%) var(--nh-moon-y, 18%),
+      rgba(225, 235, 255, 0.7) 0%, rgba(180, 200, 245, 0.28) 22%, rgba(150, 175, 235, 0) 55%),
+    radial-gradient(38% 28% at var(--nh-roof-x, 40%) var(--nh-roof-y, 30%),
+      rgba(200, 215, 255, 0.35) 0%, rgba(200, 215, 255, 0) 100%),
+    linear-gradient(180deg, rgba(120, 145, 205, 0.28) 0%, rgba(90, 115, 175, 0.08) 75%);
+  mix-blend-mode: screen;
+  opacity: var(--nh-night, 1);
+}
+
+.nh-lamps {
+  mix-blend-mode: screen;
+  opacity: var(--nh-lamp, 1);
+}
+
+.nh-stars {
+  inset: auto;
+  left: 0;
+  top: 0;
+  width: 1.4px;
+  height: 1.4px;
+  border-radius: 50%;
+  opacity: calc(var(--nh-moon, 1) * 0.85);
+}
+
+.nh-moon {
+  inset: auto;
+  left: calc(var(--nh-moon-x, 74%) - var(--nh-moon-r, 22px));
+  top: calc(var(--nh-moon-y, 18%) - var(--nh-moon-r, 22px));
+  width: calc(var(--nh-moon-r, 22px) * 2);
+  height: calc(var(--nh-moon-r, 22px) * 2);
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 36%, #FFFDF3 0%, #F3EFDD 48%, #D9D4BF 100%);
+  box-shadow: 0 0 26px 8px rgba(255, 248, 225, 0.55), 0 0 90px 30px rgba(200, 215, 250, 0.3);
+  opacity: var(--nh-moon, 1);
 }
 
 /* ---------------------------------------------------------------- */
@@ -597,6 +765,7 @@ a.card:hover,
 
   /* Movement off; gentle opacity-only effects stay (no vestibular trigger). */
   .hero-bg,
+  .hero-rays,
   .icon-tile img,
   body:not([data-page="kelola"]) {
     animation: none !important;
@@ -616,6 +785,41 @@ a.card:hover,
     transition: none;
   }
 }
+
+
+/* Respect system motion preferences across decorative and navigation effects. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+  [data-reveal] { opacity: 1 !important; transform: none !important; }
+  .hero.has-photo .hero-bg { animation: none !important; }
+}
+
+
+/* Editorial polish and compact-screen safeguards. */
+:where(button, a, input, textarea, select) { -webkit-tap-highlight-color: rgba(36, 70, 50, 0.12); }
+:where(button, a, input, textarea, select):focus-visible { outline: 3px solid #A66B22; outline-offset: 3px; }
+img { max-width: 100%; }
+main > header, main > section { scroll-margin-top: 6rem; }
+.section-title { line-height: 1.12; }
+.eyebrow { color: #315D40; letter-spacing: 0.14em; }
+.card { border: 1px solid rgba(36, 70, 50, 0.07); box-shadow: 0 12px 32px -22px rgba(25, 54, 36, 0.32); }
+@media (max-width: 767px) {
+  .hero, .hero.has-photo { min-height: min(76svh, 38rem); border-radius: 1.35rem; }
+  .hero h1 { font-size: clamp(2.35rem, 11vw, 3.75rem); line-height: 1.04; letter-spacing: -0.035em; }
+  .hero-rays { opacity: 0.3; filter: blur(4px); }
+  .quick-bar { margin-top: -1.5rem; border-radius: 1.35rem; }
+  .site-footer { border-radius: 1.35rem 1.35rem 0 0; }
+  .photo-badge { left: 0.25rem; top: -0.75rem; }
+}
+@media (min-width: 768px) { .hero h1 { max-width: 15ch; } }
+@media (prefers-reduced-motion: reduce) { .hero::after { animation: none !important; } }
 
 /* ---------------------------------------------------------------- */
 /* Mobile tab bar (Lottie pill + HTML links)                          */

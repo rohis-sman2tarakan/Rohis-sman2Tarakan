@@ -4,4 +4,4 @@ User-agent: *
 Allow: /
 Disallow: /kelola/
 
-Sitemap: https://akunsyarif-rgb.github.io/Rohis-sman2Tarakan/sitemap.xml
+Sitemap: https://rohis-sman2tarakan.github.io/sitemap.xml

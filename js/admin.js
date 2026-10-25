@@ -1,11 +1,9 @@
 /**
- * Admin workspace (prototype). All persistence goes through
- * ContentRepository (js/data.js) — this file only handles UI wiring,
- * so swapping the localStorage-backed repository for a Supabase one
- * later does not require touching this file's structure.
+ * Admin workspace. Semua penyimpanan lewat ContentRepository
+ * (js/appwrite-repository.js) — file ini hanya mengurus tampilan.
  *
- * This is a local/static prototype: there is no authentication and
- * no server. Changes made here are stored in this browser only.
+ * Akses dijaga di dua lapis: layar masuk (kode 6 angka lewat email) dan,
+ * yang sebenarnya menentukan, izin tulis di Appwrite (tim `pengurus`).
  */
 
 (function () {
@@ -45,9 +43,11 @@
   }
 
   function badge(status, activeLabel, inactiveLabel) {
-    const isActive = status === 'published' || status === 'active';
+    const allowedStatuses = new Set(['published', 'draft', 'active', 'inactive']);
+    const safeStatus = allowedStatuses.has(status) ? status : 'unknown';
+    const isActive = safeStatus === 'published' || safeStatus === 'active';
     const label = isActive ? activeLabel : inactiveLabel;
-    return `<span class="admin-badge status-${status}">${label}</span>`;
+    return `<span class="admin-badge status-${safeStatus}">${label}</span>`;
   }
 
   // --------------------------------------------------------------------
@@ -169,7 +169,7 @@
             (a) => `
         <div class="admin-row py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 justify-between">
           <div class="min-w-0">
-            <div class="flex items-center gap-2 mb-1">${badge(a.status, 'Published', 'Draft')}<span class="text-xs text-muted">${esc(formatDate(a.date))}</span></div>
+            <div class="flex items-center gap-2 mb-1">${badge(a.status, 'Published', 'Draft')}<span class="text-xs text-muted">${esc(formatDate(a.date))} &middot; Periode ${esc(RohisUtil.periodOf(a) || '—')}</span></div>
             <p class="font-medium truncate">${esc(a.title)}</p>
             <p class="text-xs text-muted truncate">${esc(a.category || '')}</p>
           </div>
@@ -215,6 +215,7 @@
         form.elements.title.value = activity.title || '';
         form.elements.date.value = (activity.date || '').slice(0, 10);
         form.elements.category.value = activity.category || '';
+        form.elements.period.value = activity.period || '';
         form.elements.excerpt.value = activity.excerpt || '';
         form.elements.cover.value = activity.cover || '';
         form.elements.content.value = activity.content || '';
@@ -239,6 +240,7 @@
       title: data.title,
       date: data.date,
       category: data.category,
+      period: data.period,
       excerpt: data.excerpt,
       cover: data.cover,
       content: data.content,
@@ -254,7 +256,7 @@
       try {
         await ContentRepository.saveActivity(activity);
       } catch (err) {
-        toast('Gagal menyimpan — penyimpanan lokal penuh. Ekspor data lalu hapus gambar besar.');
+        toast('Gagal menyimpan: ' + RohisAuth.friendly(err));
         return;
       }
       toast('Kegiatan disimpan.');
@@ -282,7 +284,7 @@
             (a) => `
         <div class="admin-row py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 justify-between">
           <div class="min-w-0">
-            <div class="flex items-center gap-2 mb-1">${badge(a.status, 'Published', 'Draft')}<span class="text-xs text-muted">${esc(formatDate(a.date))}</span></div>
+            <div class="flex items-center gap-2 mb-1">${badge(a.status, 'Published', 'Draft')}<span class="text-xs text-muted">${esc(formatDate(a.date))} &middot; Periode ${esc(RohisUtil.periodOf(a) || '—')}</span></div>
             <p class="font-medium truncate">${esc(a.title)}</p>
             <p class="text-xs text-muted truncate">${esc(a.author || '')} &middot; ${esc(a.category || '')}</p>
           </div>
@@ -331,6 +333,7 @@
         form.elements.edition.value = article.edition || '';
         form.elements.date.value = (article.date || '').slice(0, 10);
         form.elements.category.value = article.category || '';
+        form.elements.period.value = article.period || '';
         form.elements.cover.value = article.cover || '';
         form.elements.excerpt.value = article.excerpt || '';
         form.elements.content.value = article.content || '';
@@ -350,6 +353,7 @@
       edition: data.edition,
       date: data.date,
       category: data.category,
+      period: data.period,
       cover: data.cover,
       excerpt: data.excerpt,
       content: data.content,
@@ -365,7 +369,7 @@
       try {
         await ContentRepository.saveArticle(article);
       } catch (err) {
-        toast('Gagal menyimpan — penyimpanan lokal penuh. Ekspor data lalu hapus gambar besar.');
+        toast('Gagal menyimpan: ' + RohisAuth.friendly(err));
         return;
       }
       toast(article.status === 'published' ? 'Tulisan diterbitkan.' : 'Draft tersimpan.');
@@ -470,7 +474,7 @@
         order: Number(data.order) || 0,
       });
       } catch (err) {
-        toast('Gagal menyimpan — penyimpanan lokal penuh.');
+        toast('Gagal menyimpan: ' + RohisAuth.friendly(err));
         return;
       }
       toast('Program disimpan.');
@@ -482,20 +486,61 @@
   // --------------------------------------------------------------------
   // Media library (prototype: dataURL stored in localStorage)
   // --------------------------------------------------------------------
-  const MAX_MEDIA_BYTES = 350 * 1024;
+  const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // batas bucket
+  const MAX_EDGE = 1600; // sisi terpanjang setelah diperkecil (px)
+  const KEEP_AS_IS_BYTES = 700 * 1024;
+
+  /**
+   * Foto dari iPad bisa 3–8 MB. Perkecil ke JPEG ±1600px sebelum diunggah
+   * supaya halaman publik tetap ringan. GIF dibiarkan (agar tetap animasi).
+   */
+  async function prepareImage(file) {
+    const baseName = file.name.replace(/\.[^.]+$/, '') || 'gambar';
+    if (file.type === 'image/gif') return { blob: file, name: file.name };
+    let bitmap = null;
+    try {
+      bitmap = await createImageBitmap(file);
+    } catch (err) {
+      bitmap = null;
+    }
+    if (!bitmap) return { blob: file, name: file.name };
+    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1 && file.size <= KEEP_AS_IS_BYTES) {
+      bitmap.close && bitmap.close();
+      return { blob: file, name: file.name };
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close && bitmap.close();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.86));
+    if (!blob) return { blob: file, name: file.name };
+    return { blob, name: baseName + '.jpg' };
+  }
 
   function mediaThumbHTML(item, selectable) {
+    const rawPreview = String(item.dataUrl || '');
+    // Blob URLs are created locally after an authenticated media fetch.
+    const preview = /^blob:https?:/i.test(rawPreview) ? rawPreview : RohisUtil.safeUrl(rawPreview);
     return `
       <div class="border border-line rounded-lg overflow-hidden group relative" data-media-id="${esc(item.id)}">
-        <img src="${esc(RohisUtil.safeUrl(item.dataUrl))}" alt="${esc(item.name)}" class="w-full aspect-square object-cover ${selectable ? 'cursor-pointer' : ''}" ${selectable ? 'data-select="1"' : ''}>
         ${
-          selectable
-            ? ''
-            : `<div class="p-2">
-                <p class="text-xs truncate">${esc(item.name)}</p>
-                <button type="button" class="text-xs text-red-700 mt-1" data-delete-media="${esc(item.id)}">Hapus</button>
-              </div>`
+          preview
+            ? `<img src="${esc(preview)}" alt="${esc(item.name)}" class="w-full aspect-square object-cover ${selectable ? 'cursor-pointer' : ''}" ${selectable ? 'data-select="1"' : ''}>`
+            : `<div class="w-full aspect-square flex items-center justify-center bg-sage/20 text-muted text-xs p-3 text-center">${esc(item.previewError || 'Pratinjau tidak tersedia')}</div>`
         }
+        <div class="p-2">
+          <p class="text-xs truncate">${esc(item.name)}</p>
+          ${
+            selectable
+              ? (preview ? '' : '<p class="text-xs text-muted mt-1">Tidak dapat dipilih tanpa pratinjau.</p>')
+              : `<button type="button" class="text-xs text-red-700 mt-1" data-delete-media="${esc(item.id)}">Hapus</button>`
+          }
+        </div>
       </div>`;
   }
 
@@ -522,21 +567,26 @@
       const file = e.target.files[0];
       e.target.value = '';
       if (!file) return;
-      if (file.size > MAX_MEDIA_BYTES) {
-        toast(`Gambar terlalu besar (maks ${Math.round(MAX_MEDIA_BYTES / 1024)}KB untuk prototipe lokal).`);
+      if (!/^image\//.test(file.type)) {
+        toast('Hanya file gambar yang bisa diunggah.');
         return;
       }
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          await ContentRepository.saveMedia({ name: file.name, dataUrl: reader.result, size: file.size });
-          toast('Gambar diunggah.');
-          loadMediaList();
-        } catch (err) {
-          toast('Gagal menyimpan gambar — penyimpanan lokal penuh.');
+      toast('Mengunggah…');
+      try {
+        const prepared = await prepareImage(file);
+        if (prepared.blob.size > MAX_UPLOAD_BYTES) {
+          toast('Gambar terlalu besar (maks 5 MB).');
+          return;
         }
-      };
-      reader.readAsDataURL(file);
+        const uploaded = await ContentRepository.saveMedia(prepared);
+        if (uploaded && uploaded.previewUrl) {
+          try { URL.revokeObjectURL(uploaded.previewUrl); } catch (err) { /* abaikan */ }
+        }
+        toast('Gambar diunggah secara privat. Pilih sebagai cover lalu terbitkan konten untuk membuka akses publik.');
+        loadMediaList();
+      } catch (err) {
+        toast('Gagal mengunggah: ' + RohisAuth.friendly(err));
+      }
     });
   }
 
@@ -556,8 +606,8 @@
           img.addEventListener('click', () => {
             const wrapper = img.closest('[data-media-id]');
             const item = media.find((m) => m.id === wrapper.dataset.mediaId);
-            if (item && mediaPickerTargetId) {
-              qs(`#${mediaPickerTargetId}`).value = item.dataUrl;
+            if (item && mediaPickerTargetId && item.url) {
+              qs(`#${mediaPickerTargetId}`).value = item.url;
             }
             closeMediaPicker();
           });
@@ -678,9 +728,117 @@
   }
 
   // --------------------------------------------------------------------
+  // Login (kode 6 angka lewat email)
+  // --------------------------------------------------------------------
+  const gate = qs('#login-gate');
+
+  function gateState(name) {
+    qsa('[data-login-state]', gate).forEach((el) => { el.hidden = el.dataset.loginState !== name; });
+    gate.hidden = false;
+    const focusTarget = { email: '#login-email', code: '#login-code' }[name];
+    if (focusTarget) setTimeout(() => qs(focusTarget, gate).focus(), 50);
+  }
+
+  function gateError(message) {
+    const el = qs('[data-login-error]', gate);
+    el.textContent = message || '';
+    el.hidden = !message;
+  }
+
+  /** Menampilkan layar masuk sampai pengurus terdaftar berhasil login. */
+  function requireLogin() {
+    return new Promise((resolve) => {
+      let userId = null;
+      let email = '';
+      const emailForm = qs('form[data-login-state="email"]', gate);
+      const codeForm = qs('form[data-login-state="code"]', gate);
+
+      function done(session) {
+        qsa('[data-user-email]').forEach((el) => { el.textContent = session.user.email || ''; });
+        gate.hidden = true;
+        resolve(session);
+      }
+
+      function handleSession(session) {
+        if (!session) return false;
+        if (session.member) { done(session); return true; }
+        qsa('[data-login-email]', gate).forEach((el) => { el.textContent = session.user.email; });
+        gateError('');
+        gateState('denied');
+        return true;
+      }
+
+      function busy(form, on) {
+        qsa('button, input', form).forEach((el) => { el.disabled = on; });
+      }
+
+      emailForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        email = qs('#login-email').value.trim();
+        if (!/^\S+@\S+\.\S+$/.test(email)) { gateError('Masukkan alamat email yang valid.'); return; }
+        gateError('');
+        busy(emailForm, true);
+        try {
+          userId = await RohisAuth.sendCode(email);
+          qsa('[data-login-email]', gate).forEach((el) => { el.textContent = email; });
+          qs('#login-code').value = '';
+          gateState('code');
+        } catch (err) {
+          gateError(RohisAuth.friendly(err));
+        } finally {
+          busy(emailForm, false);
+        }
+      });
+
+      codeForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const code = qs('#login-code').value.trim();
+        if (!code) { gateError('Masukkan kode dari email.'); return; }
+        gateError('');
+        busy(codeForm, true);
+        try {
+          const session = await RohisAuth.verify(userId, code);
+          if (!handleSession(session)) gateError('Login gagal. Coba kirim kode baru.');
+        } catch (err) {
+          gateError(RohisAuth.friendly(err));
+        } finally {
+          busy(codeForm, false);
+        }
+      });
+
+      qs('[data-login-back]', gate).addEventListener('click', () => { gateError(''); gateState('email'); });
+      qs('[data-login-logout]', gate).addEventListener('click', async () => {
+        await RohisAuth.logout();
+        gateError('');
+        gateState('email');
+      });
+
+      // Sesi lama yang masih berlaku -> langsung masuk.
+      gateState('loading');
+      RohisAuth.me()
+        .then((session) => { if (!handleSession(session)) gateState('email'); })
+        .catch((err) => { gateState('email'); gateError(RohisAuth.friendly(err)); });
+
+      // Sesi habis saat bekerja -> kembali ke layar masuk.
+      window.addEventListener('rohis:auth-expired', () => {
+        if (!gate.hidden) return;
+        gateError('Sesi habis. Silakan masuk lagi.');
+        gateState('email');
+      });
+    });
+  }
+
+  // --------------------------------------------------------------------
   // Boot
   // --------------------------------------------------------------------
-  document.addEventListener('DOMContentLoaded', () => {
+  window.addEventListener('unhandledrejection', (e) => {
+    const err = e.reason;
+    if (err && err.status === 401) return; // ditangani layar masuk
+    console.error(err);
+    toast('Gagal: ' + RohisAuth.friendly(err));
+  });
+
+  document.addEventListener('DOMContentLoaded', async () => {
     initSidebarToggle();
     initQuickActions();
     initActivityForm();
@@ -690,7 +848,15 @@
     initMediaPicker();
     initSettingsForm();
     initDataExport();
+    qsa('[data-action="logout"]').forEach((btn) =>
+      btn.addEventListener('click', async () => {
+        await RohisAuth.logout();
+        window.location.reload();
+      })
+    );
     window.addEventListener('hashchange', renderView);
+
+    await requireLogin();
     renderView();
   });
 })();

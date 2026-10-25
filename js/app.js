@@ -23,6 +23,23 @@
     return u && (u.startsWith('#') || RohisUtil.safeUrl(u)) ? u : fallback;
   };
 
+  // Tautan luar dibuka di tab baru; tautan internal tetap di halaman yang sama.
+  function setLink(el, url, fallback) {
+    if (!el) return;
+    const href = safeHref(url, fallback);
+    if (href) el.href = href;
+    if (/^https?:/i.test(el.getAttribute('href') || '')) {
+      el.target = '_blank';
+      el.rel = 'noopener noreferrer';
+    }
+  }
+
+  // Semua tombol "Gabung" mengikuti satu alamat: Pengaturan -> Bergabung.
+  function applyJoinLinks(site) {
+    const url = site.join && site.join.ctaUrl;
+    qsa('[data-join-link]').forEach((el) => setLink(el, url, el.getAttribute('href')));
+  }
+
   function setText(el, value) {
     if (el && value != null) el.textContent = value;
   }
@@ -190,7 +207,7 @@
     const cta = qs('[data-field="hero-cta"]');
     if (cta) {
       setText(cta, hero.ctaLabel);
-      cta.href = safeHref(hero.ctaUrl, '#kontak');
+      setLink(cta, hero.ctaUrl, '#kontak');
     }
 
     if (heroEl) {
@@ -213,7 +230,7 @@
     const cta = qs('[data-field="join-cta"]');
     if (cta) {
       setText(cta, join.ctaLabel);
-      cta.href = safeHref(join.ctaUrl, '#kontak');
+      setLink(cta, join.ctaUrl, '#kontak');
     }
   }
 
@@ -269,7 +286,7 @@
 
   function activityCardHTML(activity) {
     return `
-      <a href="./kegiatan-detail.html?id=${encodeURIComponent(activity.id)}" class="card group flex flex-col" data-reveal data-category="${esc(activity.category || '')}">
+      <a href="./kegiatan-detail.html?id=${encodeURIComponent(activity.id)}" class="card group flex flex-col" data-reveal data-category="${esc(activity.category || '')}" data-period="${esc(RohisUtil.periodOf(activity))}">
         <div class="media-frame">${activityCoverHTML(activity, 'aspect-[4/3]')}</div>
         <div class="card-body flex flex-col flex-1">
           <span class="chip self-start mb-3">${esc(activity.category || 'Kegiatan')}</span>
@@ -307,7 +324,7 @@
     }
 
     container.innerHTML = `<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">${activities.map(activityCardHTML).join('')}</div>`;
-    initCategoryFilter(activities, container, 'activities-category');
+    initFilters(activities, container, 'activities-period', 'activities-category');
   }
 
   // ------------------------------------------------------------------
@@ -315,7 +332,7 @@
   // ------------------------------------------------------------------
   function articleCardHTML(article) {
     return `
-      <a href="./tulisan-detail.html?id=${encodeURIComponent(article.id)}" class="card group block p-6" data-reveal data-category="${esc(article.category || '')}">
+      <a href="./tulisan-detail.html?id=${encodeURIComponent(article.id)}" class="card group block p-6" data-reveal data-category="${esc(article.category || '')}" data-period="${esc(RohisUtil.periodOf(article))}">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div class="min-w-0">
             <span class="chip">${esc(article.category || 'Tulisan')}</span>
@@ -348,42 +365,75 @@
     }
 
     container.innerHTML = `<div class="space-y-4">${articles.map(articleCardHTML).join('')}</div>`;
-    initCategoryFilter(articles, container, 'articles-category');
+    initFilters(articles, container, 'articles-period', 'articles-category');
   }
 
   // ------------------------------------------------------------------
-  // Category filter (shared, lightweight)
+  // Filter periode + kategori (dipakai bersama, ringan)
   // ------------------------------------------------------------------
-  function initCategoryFilter(items, listContainer, filterName) {
-    const filterBar = qs(`[data-filter="${filterName}"]`);
-    if (!filterBar) return;
+  const ALL_PERIODS = '';
+  const chipClass = (on) =>
+    'tap-target px-4 py-2 rounded-full text-xs font-semibold border transition ' +
+    (on ? 'bg-forest text-white border-forest' : 'bg-white text-muted border-line hover:border-forest hover:text-forest');
 
-    const categories = Array.from(new Set(items.map((i) => i.category).filter(Boolean)));
-    filterBar.innerHTML = ['Semua', ...categories]
-      .map(
-        (cat, i) => `
-        <button type="button" class="tap-target px-4 py-2 rounded-full text-xs font-semibold border border-line transition ${
-          i === 0 ? 'bg-forest text-white border-forest' : 'bg-white text-muted hover:border-forest hover:text-forest'
-        }" data-cat="${cat === 'Semua' ? '' : esc(cat)}">${esc(cat)}</button>`
-      )
-      .join('');
+  function initFilters(items, listContainer, periodFilterName, categoryFilterName) {
+    const periodBar = qs(`[data-filter="${periodFilterName}"]`);
+    const catBar = qs(`[data-filter="${categoryFilterName}"]`);
+    if (!catBar) return;
 
-    qsa('button', filterBar).forEach((btn) => {
-      btn.addEventListener('click', () => {
-        qsa('button', filterBar).forEach((b) => {
-          b.classList.remove('bg-forest', 'text-white', 'border-forest');
-          b.classList.add('text-muted', 'bg-white');
-        });
-        btn.classList.add('bg-forest', 'text-white', 'border-forest');
-        btn.classList.remove('text-muted', 'bg-white');
+    // Periode terbaru lebih dulu; secara bawaan yang tampil adalah periode terbaru.
+    const periods = Array.from(new Set(items.map((i) => RohisUtil.periodOf(i)).filter(Boolean))).sort().reverse();
+    const state = { period: periods.length > 1 ? periods[0] : ALL_PERIODS, cat: '' };
 
-        const cat = btn.dataset.cat;
-        qsa('[data-category]', listContainer).forEach((el) => {
-          const match = !cat || el.dataset.category === cat;
-          el.classList.toggle('hidden', !match);
-        });
+    function apply() {
+      qsa('[data-category]', listContainer).forEach((el) => {
+        const okPeriod = !state.period || el.dataset.period === state.period;
+        const okCat = !state.cat || el.dataset.category === state.cat;
+        el.classList.toggle('is-filtered-out', !(okPeriod && okCat));
       });
-    });
+    }
+
+    function renderCategoryChips() {
+      const inScope = items.filter((i) => !state.period || RohisUtil.periodOf(i) === state.period);
+      const categories = Array.from(new Set(inScope.map((i) => i.category).filter(Boolean)));
+      if (state.cat && !categories.includes(state.cat)) state.cat = '';
+      catBar.innerHTML = ['Semua', ...categories]
+        .map((cat) => {
+          const value = cat === 'Semua' ? '' : cat;
+          return `<button type="button" class="${chipClass(value === state.cat)}" data-cat="${esc(value)}">${esc(cat)}</button>`;
+        })
+        .join('');
+      qsa('button', catBar).forEach((btn) =>
+        btn.addEventListener('click', () => {
+          state.cat = btn.dataset.cat;
+          renderCategoryChips();
+          apply();
+        })
+      );
+    }
+
+    function renderPeriodChips() {
+      if (!periodBar || periods.length < 2) {
+        if (periodBar) periodBar.classList.add('hidden');
+        return;
+      }
+      const options = [...periods.map((p) => [p, 'Periode ' + p]), [ALL_PERIODS, 'Semua periode']];
+      periodBar.innerHTML = options
+        .map(([value, label]) => `<button type="button" class="${chipClass(value === state.period)}" data-period-chip="${esc(value)}" aria-pressed="${value === state.period}">${esc(label)}</button>`)
+        .join('');
+      qsa('button', periodBar).forEach((btn) =>
+        btn.addEventListener('click', () => {
+          state.period = btn.dataset.periodChip;
+          renderPeriodChips();
+          renderCategoryChips();
+          apply();
+        })
+      );
+    }
+
+    renderPeriodChips();
+    renderCategoryChips();
+    apply();
   }
 
   // ------------------------------------------------------------------
@@ -491,6 +541,7 @@
     const page = document.body.dataset.page;
     const site = await ContentRepository.getSite();
     renderFooter(site);
+    applyJoinLinks(site);
     qsa('[data-field="motto"]').forEach((el) => {
       if (site.motto) el.textContent = site.motto;
       else (el.closest('.hero-motto') || el).classList.add('hidden');
