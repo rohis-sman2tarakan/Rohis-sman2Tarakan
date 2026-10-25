@@ -22,6 +22,7 @@
 
   var built = false, rays, canvas, ctx, sprite;
   var W = 0, H = 0, dpr = 1, sunX = 0, sunY = 0;
+  var FRAME_MS = 32;
   var dust = [], running = false, visible = true, raf = 0, last = 0;
 
   function mapPoint(px, py, w, h) {
@@ -95,7 +96,8 @@
     rays.style.transformOrigin = sunX.toFixed(0) + 'px ' + sunY.toFixed(0) + 'px';
 
     W = w; H = h;
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    /* Sprite cahaya sudah lembut; kanvas 1x cukup dan jauh lebih ringan di layar retina. */
+    dpr = 1;
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     seed();
@@ -128,10 +130,12 @@
 
   function loop(t) {
     if (!running) return;
+    raf = requestAnimationFrame(loop);
+    /* Debu bergerak hanya beberapa px per detik; 30 fps tidak terlihat bedanya. */
+    if (last && t - last < FRAME_MS) return;
     var dt = last ? Math.min(0.05, (t - last) / 1000) : 0;
     last = t;
     draw(t, dt);
-    raf = requestAnimationFrame(loop);
   }
   function start() {
     if (reduce || running || !visible || document.hidden || !built) return;
