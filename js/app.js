@@ -8,11 +8,14 @@
 (function () {
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // Building an Intl formatter is slow; share one across all list items.
+  const dateFormat = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
   function formatDate(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     if (Number.isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    return dateFormat.format(d);
   }
 
   const esc = (v) => RohisUtil.escapeHtml(v);
@@ -244,7 +247,7 @@
   function programItemHTML(program) {
     const icon = PROGRAM_ICONS[program.id];
     const badge = icon
-      ? `<img src="./assets/images/${icon}.png" alt="" width="64" height="64" class="h-16 w-16" loading="lazy">`
+      ? `<img src="./assets/images/${icon}.webp" alt="" width="64" height="64" class="h-16 w-16" loading="lazy">`
       : `<span class="num-badge">${esc(program.number)}</span>`;
     return `
       <div class="card is-hoverable p-7" data-reveal>
@@ -562,7 +565,9 @@
 
     const page = document.body.dataset.page;
     let site = {};
-    await guarded(async () => {
+    // Site settings and page content load in parallel: each is a network
+    // round trip, and only the hero/about/join renderers need `site`.
+    const siteReady = guarded(async () => {
       site = await ContentRepository.getSite();
       renderFooter(site);
       applyJoinLinks(site);
@@ -575,7 +580,7 @@
     const tasks = [];
     if (page === 'home') {
       tasks.push(
-        () => { renderHero(site); renderAbout(site); renderJoin(site); },
+        async () => { await siteReady; renderHero(site); renderAbout(site); renderJoin(site); },
         renderPrograms,
         renderActivitiesPreview,
         renderArticlesPreview
@@ -589,9 +594,9 @@
     } else if (page === 'tulisan-detail') {
       tasks.push(renderArticleDetail);
     } else if (page === 'tentang') {
-      tasks.push(() => renderAbout(site), renderPrograms);
+      tasks.push(async () => { await siteReady; renderAbout(site); }, renderPrograms);
     }
-    await Promise.all(tasks.map(guarded));
+    await Promise.all([siteReady, ...tasks.map(guarded)]);
 
     showLoadErrors();
     initReveal();
