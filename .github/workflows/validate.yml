@@ -15,6 +15,13 @@ jobs:
       - name: Check JSON validity, required fields, and internal links
         run: node .github/scripts/validate.js
 
+      - name: Check JavaScript syntax
+        run: |
+          for f in js/*.js .github/scripts/*.js tests/*.js; do node --check "$f"; done
+
+      - name: Run sanitizer regression tests
+        run: node --test tests/*.test.js
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
