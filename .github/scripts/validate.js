@@ -186,7 +186,7 @@ try {
   if (util.safeUrl('https:evil.example') !== '') fail('RohisUtil.safeUrl menerima URL HTTPS yang tidak absolut.');
   if (util.safeUrl('https://example.com/a' + String.fromCharCode(92) + 'b.png') !== '') fail('RohisUtil.safeUrl menerima backslash pada URL.');
   if (util.safeUrl('data:image/svg+xml,<svg onload=alert(1)>') !== '') fail('RohisUtil.safeUrl menerima SVG data URL.');
-  if (util.safeUrl('x\") ; background-image:url(https://evil.example/x)') !== '') fail('RohisUtil.safeUrl menerima karakter yang berbahaya dalam konteks CSS.');
+  if (util.safeUrl('x") ; background-image:url(https://evil.example/x)') !== '') fail('RohisUtil.safeUrl menerima karakter yang berbahaya dalam konteks CSS.');
   if (util.safeUrl('relative\npath.jpg') !== '') fail('RohisUtil.safeUrl menerima karakter kontrol.');
   if (util.safeUrl('https://example.com/image.webp') !== 'https://example.com/image.webp') fail('RohisUtil.safeUrl menolak HTTPS yang valid.');
   if (util.safeUrl('../assets/images/hero-rumah-lamin.jpg') !== '../assets/images/hero-rumah-lamin.jpg') fail('RohisUtil.safeUrl menolak path relatif yang valid.');

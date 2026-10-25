@@ -527,6 +527,28 @@
   // ------------------------------------------------------------------
   // Boot
   // ------------------------------------------------------------------
+  // One failed section must not leave the page blank or hidden: log it,
+  // keep going, and let showLoadErrors() tell the visitor what is missing.
+  async function guarded(task) {
+    try {
+      await task();
+    } catch (err) {
+      console.error('Gagal memuat bagian halaman:', err);
+    }
+  }
+
+  function showLoadErrors() {
+    const message = 'Konten belum bisa dimuat. Periksa koneksi internet lalu muat ulang halaman.';
+    qsa('[data-list], [data-detail]').forEach((el) => {
+      if (el.children.length) return;
+      const note = document.createElement('p');
+      note.className = 'text-sm text-muted py-6';
+      note.setAttribute('role', 'status');
+      note.textContent = message;
+      el.appendChild(note);
+    });
+  }
+
   async function boot() {
     initNav();
     initPageTransitions();
@@ -539,32 +561,39 @@
     }
 
     const page = document.body.dataset.page;
-    const site = await ContentRepository.getSite();
-    renderFooter(site);
-    applyJoinLinks(site);
-    qsa('[data-field="motto"]').forEach((el) => {
-      if (site.motto) el.textContent = site.motto;
-      else (el.closest('.hero-motto') || el).classList.add('hidden');
+    let site = {};
+    await guarded(async () => {
+      site = await ContentRepository.getSite();
+      renderFooter(site);
+      applyJoinLinks(site);
+      qsa('[data-field="motto"]').forEach((el) => {
+        if (site.motto) el.textContent = site.motto;
+        else (el.closest('.hero-motto') || el).classList.add('hidden');
+      });
     });
 
+    const tasks = [];
     if (page === 'home') {
-      renderHero(site);
-      renderAbout(site);
-      renderJoin(site);
-      await Promise.all([renderPrograms(), renderActivitiesPreview(), renderArticlesPreview()]);
+      tasks.push(
+        () => { renderHero(site); renderAbout(site); renderJoin(site); },
+        renderPrograms,
+        renderActivitiesPreview,
+        renderArticlesPreview
+      );
     } else if (page === 'kegiatan') {
-      await renderActivitiesFull();
+      tasks.push(renderActivitiesFull);
     } else if (page === 'kegiatan-detail') {
-      await renderActivityDetail();
+      tasks.push(renderActivityDetail);
     } else if (page === 'tulisan') {
-      await renderArticlesFull();
+      tasks.push(renderArticlesFull);
     } else if (page === 'tulisan-detail') {
-      await renderArticleDetail();
+      tasks.push(renderArticleDetail);
     } else if (page === 'tentang') {
-      renderAbout(site);
-      await renderPrograms();
+      tasks.push(() => renderAbout(site), renderPrograms);
     }
+    await Promise.all(tasks.map(guarded));
 
+    showLoadErrors();
     initReveal();
   }
 
